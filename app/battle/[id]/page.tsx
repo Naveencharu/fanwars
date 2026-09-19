@@ -66,6 +66,8 @@ export default function BattlePage() {
         "success" | "error" | ""
     >("");
 
+    const [shareMessage, setShareMessage] = useState("");
+
 
     /* =======================================================
        INITIAL LOAD
@@ -423,7 +425,47 @@ export default function BattlePage() {
         }
     }
 
+    /* =======================================================
+       SHARE
+       ======================================================= */
 
+    async function handleShare() {
+        if (!battle) {
+            return;
+        }
+
+        const shareUrl = window.location.href;
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: `FanWars: ${battle.title}`,
+                    text: `Join me in this FanWar: ${battle.title}`,
+                    url: shareUrl,
+                });
+
+                setShareMessage("Shared successfully.");
+                setTimeout(() => setShareMessage(""), 2500);
+                return;
+            }
+
+            await navigator.clipboard.writeText(shareUrl);
+
+            setShareMessage("Battle link copied.");
+            setTimeout(() => setShareMessage(""), 2500);
+        } catch (error) {
+            console.error("Share error:", error);
+
+            try {
+                await navigator.clipboard.writeText(shareUrl);
+                setShareMessage("Battle link copied.");
+                setTimeout(() => setShareMessage(""), 2500);
+            } catch {
+                setShareMessage("Unable to share this FanWar.");
+                setTimeout(() => setShareMessage(""), 2500);
+            }
+        }
+    }
     /* =======================================================
        LOADING
        ======================================================= */
@@ -557,12 +599,28 @@ export default function BattlePage() {
 
                     {/* BACK */}
 
-                    <Link
-                        href="/home"
-                        className="inline-flex items-center gap-2 text-sm font-bold text-[#766f82] transition hover:text-purple-600"
-                    >
-                        ← Back to Home
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <Link
+                            href="/home"
+                            className="inline-flex items-center gap-2 text-sm font-bold text-[#766f82] transition hover:text-purple-600"
+                        >
+                            ← Back to Home
+                        </Link>
+
+                        <button
+                            type="button"
+                            onClick={handleShare}
+                            className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-extrabold text-[#171525] shadow-sm ring-1 ring-black/[0.06] transition hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                            ↗ Share FanWar
+                        </button>
+                    </div>
+
+                    {shareMessage && (
+                        <div className="mt-3 text-right text-xs font-bold text-purple-600">
+                            {shareMessage}
+                        </div>
+                    )}
 
 
                     {/* =================================================

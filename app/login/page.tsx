@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import FanWarsLogo from "@/components/fanwars-logo";
 import { supabase } from "@/lib/supabase";
 
@@ -14,83 +15,126 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    async function handleLogin(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
+    async function handleLogin() {
+        
+        if (loading) {
+            return;
+        }
 
-        setLoading(true);
         setError("");
 
-        const { data, error: loginError } =
-            await supabase.auth.signInWithPassword({
-                email: email.trim(),
-                password,
-            });
+        const cleanEmail = email.trim();
 
-        if (loginError) {
-            setError(loginError.message);
-            setLoading(false);
+        if (!cleanEmail) {
+            setError("Please enter your email.");
             return;
         }
 
-        const user = data.user;
-
-        if (!user) {
-            setError("Login succeeded, but no user session was found.");
-            setLoading(false);
+        if (!password) {
+            setError("Please enter your password.");
             return;
         }
 
-        // Check whether this user has already completed Fan Identity.
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("id", user.id)
-            .maybeSingle();
+        setLoading(true);
 
-        if (profileError) {
-            console.error("Profile lookup failed:", profileError);
-            setError("We couldn't load your FanWars profile.");
+        try {
+            const { data, error: loginError } =
+                await supabase.auth.signInWithPassword({
+                    email: cleanEmail,
+                    password,
+                });
+
+            if (loginError) {
+                console.error("Login error:", loginError);
+                setError(loginError.message);
+                setLoading(false);
+                return;
+            }
+
+            const user = data.user;
+
+            if (!user) {
+                setError(
+                    "Login succeeded, but no user session was found."
+                );
+                setLoading(false);
+                return;
+            }
+
+            const {
+                data: profile,
+                error: profileError,
+            } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (profileError) {
+                console.error(
+                    "Profile lookup failed:",
+                    profileError
+                );
+
+                setError(
+                    "Login worked, but we couldn't load your FanWars profile."
+                );
+
+                setLoading(false);
+                return;
+            }
+
+            if (profile) {
+                router.replace("/home");
+            } else {
+                router.replace("/onboarding");
+            }
+        } catch (error) {
+            console.error("Unexpected login error:", error);
+
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "Something went wrong while logging in."
+            );
+
             setLoading(false);
-            return;
-        }
-
-        if (profile) {
-            // Existing FanWars user → go directly to Home.
-            router.replace("/home");
-        } else {
-            // New authenticated user → complete Fan Identity.
-            router.replace("/onboarding");
         }
     }
 
     return (
-        <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-            <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-8">
+        <main className="min-h-screen bg-[#fcfbf8] px-5 py-8 sm:px-8">
+            <div className="mx-auto flex min-h-[90vh] max-w-md flex-col justify-center">
+
                 {/* Logo */}
-                <div className="flex justify-center">
-                    <FanWarsLogo href="/" size="lg" />
-                </div>
+                <div className="mb-8 text-center">
+                    <div className="flex justify-center">
+                        <FanWarsLogo href="/" size="lg" />
+                    </div>
 
-                {/* Heading */}
-                <div className="mt-12 text-center">
-                    <h1 className="text-4xl font-black tracking-[-0.045em]">
-                        Welcome back
-                    </h1>
-
-                    <p className="mt-3 text-base text-[#686577]">
-                        Sign in and get back into the FanWars.
+                    <p className="mt-4 text-sm font-semibold text-[#777286]">
+                        Welcome back to FanWars.
                     </p>
                 </div>
 
-                {/* Form */}
-                <form
-                    onSubmit={handleLogin}
-                    className="mt-8 rounded-[2rem] border border-black/[0.06] bg-white p-7 shadow-sm"
-                >
+                {/* Login Card */}
+                <div className="rounded-[30px] border border-black/[0.06] bg-white p-6 shadow-[0_20px_60px_rgba(40,25,70,0.08)] sm:p-8">
+
+                    <div className="mb-7">
+                        <h1 className="text-2xl font-black tracking-tight text-[#171525]">
+                            Log in
+                        </h1>
+
+                        <p className="mt-2 text-sm leading-6 text-[#777286]">
+                            Sign in to continue your FanWars journey.
+                        </p>
+                    </div>
+
+                    {/* Email */}
                     <div>
                         <label
                             htmlFor="email"
-                            className="text-sm font-bold text-[#171525]"
+                            className="mb-2 block text-xs font-extrabold uppercase tracking-[0.12em] text-[#777286]"
                         >
                             Email
                         </label>
@@ -98,65 +142,88 @@ export default function LoginPage() {
                         <input
                             id="email"
                             type="email"
-                            required
+                            inputMode="email"
                             autoComplete="email"
                             value={email}
-                            onChange={(event) => setEmail(event.target.value)}
+                            onChange={(event) =>
+                                setEmail(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    handleLogin();
+                                }
+                            }}
                             placeholder="you@example.com"
-                            className="mt-2 w-full rounded-2xl border border-[#dfe2ea] bg-[#f8f9fb] px-4 py-3.5 text-sm outline-none transition placeholder:text-[#9a97a5] focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
+                            className="w-full rounded-2xl border border-black/[0.08] bg-[#fcfbf8] px-4 py-3.5 text-sm font-semibold text-[#171525] outline-none transition placeholder:text-[#aaa4b1] focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
                         />
                     </div>
 
+                    {/* Password */}
                     <div className="mt-5">
-                        <div className="flex items-center justify-between">
-                            <label
-                                htmlFor="password"
-                                className="text-sm font-bold text-[#171525]"
-                            >
-                                Password
-                            </label>
-                        </div>
+                        <label
+                            htmlFor="password"
+                            className="mb-2 block text-xs font-extrabold uppercase tracking-[0.12em] text-[#777286]"
+                        >
+                            Password
+                        </label>
 
                         <input
                             id="password"
                             type="password"
-                            required
                             autoComplete="current-password"
                             value={password}
-                            onChange={(event) => setPassword(event.target.value)}
+                            onChange={(event) =>
+                                setPassword(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    handleLogin();
+                                }
+                            }}
                             placeholder="Enter your password"
-                            className="mt-2 w-full rounded-2xl border border-[#dfe2ea] bg-[#f8f9fb] px-4 py-3.5 text-sm outline-none transition placeholder:text-[#9a97a5] focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
+                            className="w-full rounded-2xl border border-black/[0.08] bg-[#fcfbf8] px-4 py-3.5 text-sm font-semibold text-[#171525] outline-none transition placeholder:text-[#aaa4b1] focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
                         />
                     </div>
 
+                    {/* Error */}
                     {error && (
-                        <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm font-semibold leading-6 text-red-700">
                             {error}
                         </div>
                     )}
 
+                    {/* Login Button */}
                     <button
-                        type="submit"
+                        type="button"
+                        onClick={handleLogin}
                         disabled={loading}
-                        className="mt-6 w-full rounded-full bg-[#171525] px-5 py-4 text-sm font-extrabold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-6 w-full rounded-full bg-[#171525] px-5 py-4 text-sm font-extrabold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {loading ? "SIGNING IN..." : "SIGN IN →"}
+                        {loading ? "Signing in..." : "Log in"}
                     </button>
-                </form>
 
-                {/* Signup */}
-                <p className="mt-7 text-center text-sm text-[#686577]">
-                    New to FanWars?{" "}
+                    {/* Signup */}
+                    <p className="mt-6 text-center text-sm font-semibold text-[#777286]">
+                        Don't have a FanWars account?{" "}
+                        <Link
+                            href="/signup"
+                            className="font-extrabold text-purple-600 hover:text-purple-700"
+                        >
+                            Sign up
+                        </Link>
+                    </p>
+                </div>
+
+                {/* Back */}
+                <div className="mt-6 text-center">
                     <Link
-                        href="/signup"
-                        className="font-extrabold text-purple-600 hover:text-purple-700"
+                        href="/"
+                        className="text-sm font-bold text-[#777286] hover:text-purple-600"
                     >
-                        Create your account
+                        ← Back to FanWars
                     </Link>
-                </p>
-
-                <div className="mt-auto pt-10 text-center text-xs font-semibold text-[#9a97a5]">
-                    Passion creates tribes. Tribes create influence.
                 </div>
             </div>
         </main>
