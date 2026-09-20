@@ -192,31 +192,38 @@ export default function ProfilePage() {
                                     <p className="mt-1 text-sm font-semibold text-[#777286]">
                                         @{profile.handler}
                                     </p>
+
+                                    <Link
+                                        href={`/u/${profile.handler}`}
+                                        className="mt-3 inline-flex rounded-full bg-[#171525] px-4 py-2 text-xs font-extrabold text-white transition hover:opacity-90"
+                                    >
+                                        View Public FanPage →
+                                    </Link>
                                 </div>
+
+                                <Link
+                                    href="/home"
+                                    className="hidden rounded-full bg-[#171525] px-5 py-2.5 text-sm font-extrabold text-white transition hover:opacity-90 sm:inline-flex"
+                                >
+                                    Back to Home
+                                </Link>
                             </div>
 
-                            <Link
-                                href="/home"
-                                className="hidden rounded-full bg-[#171525] px-5 py-2.5 text-sm font-extrabold text-white transition hover:opacity-90 sm:inline-flex"
-                            >
-                                Back to Home
-                            </Link>
-                        </div>
+                            {profile.bio && (
+                                <p className="mt-6 max-w-2xl text-sm leading-6 text-[#686577]">
+                                    {profile.bio}
+                                </p>
+                            )}
 
-                        {profile.bio && (
-                            <p className="mt-6 max-w-2xl text-sm leading-6 text-[#686577]">
-                                {profile.bio}
-                            </p>
-                        )}
+                            <div className="mt-6 flex flex-wrap gap-2">
+                                <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+                                    FanWars member
+                                </span>
 
-                        <div className="mt-6 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
-                                FanWars member
-                            </span>
-
-                            <span className="rounded-full bg-black/[0.04] px-3 py-1.5 text-xs font-bold text-[#686577]">
-                                Joined {memberSince}
-                            </span>
+                                <span className="rounded-full bg-black/[0.04] px-3 py-1.5 text-xs font-bold text-[#686577]">
+                                    Joined {memberSince}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </section>
