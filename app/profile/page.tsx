@@ -35,6 +35,11 @@ type BattleHistory = {
 export default function ProfilePage() {
     const router = useRouter();
 
+    async function handleSignOut() {
+        await supabase.auth.signOut();
+        router.replace("/login");
+    }
+
     const [profile, setProfile] = useState<Profile | null>(null);
     const [tribes, setTribes] = useState<Tribe[]>([]);
     const [battleHistory, setBattleHistory] = useState<BattleHistory[]>([]);
@@ -207,6 +212,13 @@ export default function ProfilePage() {
                                 >
                                     Back to Home
                                 </Link>
+                                <button
+                                    type="button"
+                                    onClick={handleSignOut}
+                                    className="rounded-full border border-red-200 bg-white px-5 py-2.5 text-sm font-extrabold text-red-600 transition hover:bg-red-50"
+                                >
+                                    Sign out
+                                </button>
                             </div>
 
                             {profile.bio && (

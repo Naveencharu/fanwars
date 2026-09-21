@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function OnboardingPage() {
     const router = useRouter();
-
+    const searchParams = useSearchParams();
+    const ref = searchParams.get("ref");
     const [username, setUsername] = useState("");
     const [handler, setHandler] = useState("");
     const [displayName, setDisplayName] = useState("");
@@ -98,8 +99,27 @@ export default function OnboardingPage() {
             return;
         }
 
+        if (ref) {
+            const { error: referralError } = await supabase.rpc(
+                "claim_referral",
+                {
+                    p_referral_handler: ref,
+                    p_source_type: "onboarding",
+                    p_source_id: null,
+                }
+            );
+
+            if (referralError) {
+                console.error("Referral attribution failed:", referralError);
+                setError(`Referral attribution failed: ${referralError.message}`);
+                setSaving(false);
+                return;
+            }
+        }
+
         router.push("/tribes");
-    }
+    };
+
 
     if (loading) {
         return (

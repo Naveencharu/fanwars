@@ -136,7 +136,7 @@ export default function PublicFanPage() {
     const uniqueBattles = new Set(
         fanPage.battle_history.map((battle) => battle.battle_id)
     ).size;
-
+    const participationCount = fanPage.battle_history.length;
     return (
         <div className="min-h-screen bg-[#fcfbf8] text-[#171525]">
             <AppHeader />
@@ -201,7 +201,7 @@ export default function PublicFanPage() {
                 </section>
 
                 {/* Stats */}
-                <section className="mt-6 grid gap-4 sm:grid-cols-3">
+                <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-sm">
                         <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[#938da0]">
                             Tribes
@@ -215,7 +215,19 @@ export default function PublicFanPage() {
                             Communities joined
                         </p>
                     </div>
+                    <div className="rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-sm">
+                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[#938da0]">
+                            Participation
+                        </p>
 
+                        <p className="mt-2 text-3xl font-black">
+                            {participationCount}
+                        </p>
+
+                        <p className="mt-1 text-sm text-[#777286]">
+                            Recorded FanWars activity
+                        </p>
+                    </div>
                     <div className="rounded-[24px] border border-black/[0.06] bg-white p-6 shadow-sm">
                         <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[#938da0]">
                             FanWars

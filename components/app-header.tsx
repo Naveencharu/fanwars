@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import FanWarsLogo from "@/components/fanwars-logo";
+import { supabase } from "@/lib/supabase";
 
 type AppHeaderProps = {
     showBackToHome?: boolean;
@@ -14,6 +16,31 @@ export default function AppHeader({
     const pathname = usePathname();
 
     const isActive = (path: string) => pathname === path;
+    const [displayName, setDisplayName] = useState("");
+    const [handler, setHandler] = useState("");
+
+    useEffect(() => {
+        async function loadCurrentUser() {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) return;
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("display_name, handler")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (profile) {
+                setDisplayName(profile.display_name);
+                setHandler(profile.handler);
+            }
+        }
+
+        loadCurrentUser();
+    }, []);
 
     return (
         <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/95 backdrop-blur">
@@ -28,8 +55,8 @@ export default function AppHeader({
                     <Link
                         href="/home"
                         className={`text-sm font-bold transition ${isActive("/home")
-                                ? "text-purple-600"
-                                : "text-[#686577] hover:text-[#171525]"
+                            ? "text-purple-600"
+                            : "text-[#686577] hover:text-[#171525]"
                             }`}
                     >
                         Home
@@ -38,8 +65,8 @@ export default function AppHeader({
                     <Link
                         href="/tribes"
                         className={`text-sm font-bold transition ${isActive("/tribes")
-                                ? "text-purple-600"
-                                : "text-[#686577] hover:text-[#171525]"
+                            ? "text-purple-600"
+                            : "text-[#686577] hover:text-[#171525]"
                             }`}
                     >
                         Tribes
@@ -48,8 +75,8 @@ export default function AppHeader({
                     <Link
                         href="/rankings"
                         className={`text-sm font-bold transition ${isActive("/rankings")
-                                ? "text-purple-600"
-                                : "text-[#686577] hover:text-[#171525]"
+                            ? "text-purple-600"
+                            : "text-[#686577] hover:text-[#171525]"
                             }`}
                     >
                         Rankings
@@ -58,8 +85,8 @@ export default function AppHeader({
                     <Link
                         href="/profile"
                         className={`text-sm font-bold transition ${isActive("/profile")
-                                ? "text-purple-600"
-                                : "text-[#686577] hover:text-[#171525]"
+                            ? "text-purple-600"
+                            : "text-[#686577] hover:text-[#171525]"
                             }`}
                     >
                         Profile
@@ -75,7 +102,27 @@ export default function AppHeader({
                     )}
 
                 </nav>
+                {/* Current User */}
+                <Link
+                    href="/profile"
+                    className="hidden items-center gap-3 rounded-full border border-purple-100 bg-white px-4 py-2 md:flex"
+                >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-xs font-black text-purple-700">
+                        {displayName
+                            ? displayName.charAt(0).toUpperCase()
+                            : "F"}
+                    </div>
 
+                    <div className="min-w-0 text-left leading-tight">
+                        <p className="max-w-[140px] truncate text-xs font-extrabold text-[#171525]">
+                            {displayName || "Fan"}
+                        </p>
+
+                        <p className="max-w-[140px] truncate text-[10px] font-semibold text-[#8a8395]">
+                            {handler ? `@${handler}` : ""}
+                        </p>
+                    </div>
+                </Link>
                 {/* Mobile */}
                 <div className="flex items-center gap-2 md:hidden">
 
@@ -93,7 +140,9 @@ export default function AppHeader({
                         className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-50 text-sm font-black text-purple-700"
                         aria-label="Profile"
                     >
-                        P
+                        {displayName
+                            ? displayName.charAt(0).toUpperCase()
+                            : "F"}
                     </Link>
 
                 </div>
@@ -106,8 +155,8 @@ export default function AppHeader({
                     <Link
                         href="/home"
                         className={`text-xs font-bold ${isActive("/home")
-                                ? "text-purple-600"
-                                : "text-[#686577]"
+                            ? "text-purple-600"
+                            : "text-[#686577]"
                             }`}
                     >
                         Home
@@ -116,8 +165,8 @@ export default function AppHeader({
                     <Link
                         href="/tribes"
                         className={`text-xs font-bold ${isActive("/tribes")
-                                ? "text-purple-600"
-                                : "text-[#686577]"
+                            ? "text-purple-600"
+                            : "text-[#686577]"
                             }`}
                     >
                         Tribes
@@ -126,8 +175,8 @@ export default function AppHeader({
                     <Link
                         href="/rankings"
                         className={`text-xs font-bold ${isActive("/rankings")
-                                ? "text-purple-600"
-                                : "text-[#686577]"
+                            ? "text-purple-600"
+                            : "text-[#686577]"
                             }`}
                     >
                         Rankings
@@ -136,8 +185,8 @@ export default function AppHeader({
                     <Link
                         href="/profile"
                         className={`text-xs font-bold ${isActive("/profile")
-                                ? "text-purple-600"
-                                : "text-[#686577]"
+                            ? "text-purple-600"
+                            : "text-[#686577]"
                             }`}
                     >
                         Profile

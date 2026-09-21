@@ -2,21 +2,23 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import FanWarsLogo from "@/components/fanwars-logo";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
     const router = useRouter();
-
+    const searchParams = useSearchParams();
+    const redirect = searchParams.get("redirect");
+    const ref = searchParams.get("ref");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
     async function handleLogin() {
-        
+
         if (loading) {
             return;
         }
@@ -85,9 +87,28 @@ export default function LoginPage() {
             }
 
             if (profile) {
-                router.replace("/home");
+                if (redirect) {
+                    const redirectUrl = new URL(
+                        redirect,
+                        window.location.origin
+                    );
+
+                    if (ref && !redirectUrl.searchParams.has("ref")) {
+                        redirectUrl.searchParams.set("ref", ref);
+                    }
+
+                    router.replace(
+                        `${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`
+                    );
+                } else {
+                    router.replace("/home");
+                }
             } else {
-                router.replace("/onboarding");
+                const onboardingUrl = ref
+                    ? `/onboarding?ref=${encodeURIComponent(ref)}`
+                    : "/onboarding";
+
+                router.replace(onboardingUrl);
             }
         } catch (error) {
             console.error("Unexpected login error:", error);
@@ -208,7 +229,16 @@ export default function LoginPage() {
                     <p className="mt-6 text-center text-sm font-semibold text-[#777286]">
                         Don't have a FanWars account?{" "}
                         <Link
-                            href="/signup"
+                            href={
+                                ref
+                                    ? `/signup?ref=${encodeURIComponent(ref)}${redirect
+                                        ? `&redirect=${encodeURIComponent(redirect)}`
+                                        : ""
+                                    }`
+                                    : redirect
+                                        ? `/signup?redirect=${encodeURIComponent(redirect)}`
+                                        : "/signup"
+                            }
                             className="font-extrabold text-purple-600 hover:text-purple-700"
                         >
                             Sign up

@@ -2,11 +2,14 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function SignupPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const ref = searchParams.get("ref");
+    const redirect = searchParams.get("redirect");
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -45,7 +48,16 @@ export default function SignupPage() {
         }
 
         if (data.session) {
-            router.push("/onboarding");
+            const onboardingUrl = ref
+                ? `/onboarding?ref=${encodeURIComponent(ref)}${redirect
+                    ? `&redirect=${encodeURIComponent(redirect)}`
+                    : ""
+                }`
+                : redirect
+                    ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
+                    : "/onboarding";
+
+            router.push(onboardingUrl);
             return;
         }
 
@@ -62,7 +74,12 @@ export default function SignupPage() {
                 </Link>
 
                 <Link
-                    href="/login"
+                    href={
+                        ref
+                            ? `/login?ref=${encodeURIComponent(ref)}${redirect ? `&redirect=${encodeURIComponent(redirect)}` : ""
+                            }`
+                            : "/login"
+                    }
                     className="text-sm font-semibold text-slate-600 hover:text-slate-950"
                 >
                     Already have an account? Log in
@@ -149,7 +166,12 @@ export default function SignupPage() {
                         <div className="mt-6 text-center text-sm text-slate-500">
                             Already a FanWars member?{" "}
                             <Link
-                                href="/login"
+                                href={
+                                    ref
+                                        ? `/login?ref=${encodeURIComponent(ref)}${redirect ? `&redirect=${encodeURIComponent(redirect)}` : ""
+                                        }`
+                                        : "/login"
+                                }
                                 className="font-bold text-violet-600 hover:text-violet-500"
                             >
                                 Log in

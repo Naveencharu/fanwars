@@ -191,35 +191,52 @@ export default function TribesPage() {
                                 const selected = selectedTribes.includes(tribe.id);
 
                                 return (
-                                    <button
+                                    <div
                                         key={tribe.id}
-                                        type="button"
-                                        onClick={() => toggleTribe(tribe.id)}
-                                        className={`relative rounded-[2rem] border p-6 text-left transition ${selected
+                                        className={`relative rounded-[2rem] border transition ${selected
                                                 ? "border-purple-300 bg-purple-50 shadow-sm"
                                                 : "border-black/[0.06] bg-white hover:-translate-y-0.5 hover:shadow-md"
                                             }`}
                                     >
-                                        {selected && (
-                                            <div className="absolute right-5 top-5 flex h-7 w-7 items-center justify-center rounded-full bg-purple-600 text-sm font-black text-white">
-                                                ✓
+                                        <Link
+                                            href={`/tribes/${tribe.id}`}
+                                            className="block p-6 text-left"
+                                        >
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 text-2xl">
+                                                🔥
                                             </div>
-                                        )}
 
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 text-2xl">
-                                            🔥
-                                        </div>
+                                            <h2 className="mt-5 text-lg font-black">
+                                                {tribe.name}
+                                            </h2>
 
-                                        <h2 className="mt-5 text-lg font-black">
-                                            {tribe.name}
-                                        </h2>
+                                            {tribe.description && (
+                                                <p className="mt-2 text-sm leading-6 text-[#777384]">
+                                                    {tribe.description}
+                                                </p>
+                                            )}
 
-                                        {tribe.description && (
-                                            <p className="mt-2 text-sm leading-6 text-[#777384]">
-                                                {tribe.description}
-                                            </p>
-                                        )}
-                                    </button>
+                                            <div className="mt-5 text-xs font-extrabold text-purple-600">
+                                                View Tribe →
+                                            </div>
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleTribe(tribe.id)}
+                                            aria-label={
+                                                selected
+                                                    ? `Remove ${tribe.name} from selected tribes`
+                                                    : `Select ${tribe.name}`
+                                            }
+                                            className={`absolute right-5 top-5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-black transition ${selected
+                                                    ? "bg-purple-600 text-white"
+                                                    : "border border-black/10 bg-white text-transparent hover:border-purple-300"
+                                                }`}
+                                        >
+                                            ✓
+                                        </button>
+                                    </div>
                                 );
                             })}
                         </div>

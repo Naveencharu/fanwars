@@ -21,6 +21,7 @@ type Battle = {
     description: string | null;
     category: string;
     status: string;
+    tribe_id: number | null;
 };
 
 type BattleOption = {
@@ -55,6 +56,11 @@ export default function BattlePage() {
     const [results, setResults] = useState<BattleResult[]>([]);
 
     const [myVote, setMyVote] = useState<number | null>(null);
+
+    const [creator, setCreator] = useState<{
+        handler: string;
+        display_name: string;
+    } | null>(null);
 
     const [loading, setLoading] = useState(true);
 
@@ -111,7 +117,7 @@ export default function BattlePage() {
             } = await supabase
                 .from("battles")
                 .select(
-                    "id, title, description, category, status"
+                    "id, title, description, category, status, tribe_id"
                 )
                 .eq("id", battleId)
                 .single();
@@ -202,6 +208,17 @@ export default function BattlePage() {
 
 
             setBattle(battleData);
+
+            const { data: creatorData, error: creatorError } =
+                await supabase.rpc("get_battle_creator", {
+                    p_battle_id: battleId,
+                });
+
+            if (!creatorError && creatorData?.[0]) {
+                setCreator(creatorData[0]);
+            } else {
+                setCreator(null);
+            }
 
             setOptions(optionData ?? []);
 
@@ -308,10 +325,14 @@ export default function BattlePage() {
 
 
         if (!user) {
+            const currentUrl = window.location.pathname + window.location.search;
+            const referral = new URLSearchParams(window.location.search).get("ref");
 
-            router.push(
-                `/login?redirect=/battle/${battleId}`
-            );
+            const loginUrl = referral
+                ? `/login?redirect=${encodeURIComponent(currentUrl)}&ref=${encodeURIComponent(referral)}`
+                : `/login?redirect=${encodeURIComponent(currentUrl)}`;
+
+            router.push(loginUrl);
 
             return;
 
@@ -434,9 +455,27 @@ export default function BattlePage() {
             return;
         }
 
-        const shareUrl = window.location.href;
+        let shareUrl = window.location.href;
 
         try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (user) {
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("handler")
+                    .eq("id", user.id)
+                    .maybeSingle();
+
+                if (profile?.handler) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("ref", profile.handler);
+                    shareUrl = url.toString();
+                }
+            }
+
             if (navigator.share) {
                 await navigator.share({
                     title: `FanWars: ${battle.title}`,
@@ -643,7 +682,14 @@ export default function BattlePage() {
                         <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.18em] text-[#938b9f]">
                             {battle.category}
                         </p>
-
+                        {battle.tribe_id && (
+                            <Link
+                                href={`/tribes/${battle.tribe_id}`}
+                                className="mt-3 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-purple-600 shadow-sm ring-1 ring-black/[0.05] transition hover:-translate-y-0.5 hover:shadow-md"
+                            >
+                                View Tribe →
+                            </Link>
+                        )}
 
                         <h1 className="mt-3 text-5xl font-black tracking-[-0.06em] sm:text-6xl lg:text-7xl">
                             {battle.title}
@@ -656,6 +702,14 @@ export default function BattlePage() {
                             </p>
                         )}
 
+                        {creator && (
+                            <Link
+                                href={`/u/${creator.handler}`}
+                                className="mt-4 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-xs font-extrabold text-purple-600 shadow-sm ring-1 ring-black/[0.05] transition hover:-translate-y-0.5 hover:shadow-md"
+                            >
+                                Created by @{creator.handler}
+                            </Link>
+                        )}
                     </div>
 
 
@@ -801,16 +855,41 @@ export default function BattlePage() {
    ========================================================= */
 
 function Header() {
+    const [displayName, setDisplayName] = useState("");
+    const [handler, setHandler] = useState("");
+
+    useEffect(() => {
+        async function loadCurrentUser() {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) {
+                return;
+            }
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("display_name, handler")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (profile) {
+                setDisplayName(profile.display_name);
+                setHandler(profile.handler);
+            }
+        }
+
+        loadCurrentUser();
+    }, []);
 
     return (
         <header className="sticky top-0 z-50 border-b border-purple-100/60 bg-white/90 backdrop-blur-xl">
-
             <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
 
                 <FanWarsLogo />
 
                 <nav className="hidden items-center gap-8 text-sm font-bold text-[#676174] md:flex">
-
                     <Link
                         href="/home"
                         className="transition hover:text-purple-600"
@@ -824,19 +903,29 @@ function Header() {
                     >
                         Tribes
                     </Link>
-
                 </nav>
 
-
                 <Link
-                    href="/home"
-                    className="rounded-full border border-purple-100 bg-white px-4 py-2 text-xs font-extrabold shadow-sm"
+                    href="/profile"
+                    className="flex items-center gap-3 rounded-full border border-purple-100 bg-white px-4 py-2 shadow-sm"
                 >
-                    My FanWars
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-xs font-black text-purple-700">
+                        {displayName
+                            ? displayName.charAt(0).toUpperCase()
+                            : "F"}
+                    </div>
+
+                    <div className="hidden text-left leading-tight sm:block">
+                        <p className="max-w-[120px] truncate text-xs font-extrabold text-[#171525]">
+                            {displayName || "Fan"}
+                        </p>
+
+                        <p className="max-w-[120px] truncate text-[10px] font-semibold text-[#8a8395]">
+                            {handler ? `@${handler}` : ""}
+                        </p>
+                    </div>
                 </Link>
-
             </div>
-
         </header>
     );
 }
