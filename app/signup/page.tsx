@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function SignupPage() {
+function SignupPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const ref = searchParams.get("ref");
@@ -185,5 +185,21 @@ export default function SignupPage() {
                 </div>
             </section>
         </main>
+    );
+}
+
+export default function SignupPagecontent() {
+    return (
+        <Suspense
+            fallback={
+                <main className="flex min-h-screen items-center justify-center bg-[#faf9ff]">
+                    <div className="text-sm font-semibold text-slate-500">
+                        Loading FanWars...
+                    </div>
+                </main>
+            }
+        >
+            <SignupPageContent />
+        </Suspense>
     );
 }

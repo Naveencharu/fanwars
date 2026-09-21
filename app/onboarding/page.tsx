@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function OnboardingPage() {
+function OnboardingPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const ref = searchParams.get("ref");
@@ -254,5 +254,21 @@ export default function OnboardingPage() {
                 </div>
             </section>
         </main>
+    );
+}
+
+export default function OnboardingPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="flex min-h-screen items-center justify-center bg-[#faf9ff]">
+                    <div className="text-sm font-semibold text-slate-500">
+                        Loading your FanWars identity...
+                    </div>
+                </main>
+            }
+        >
+            <OnboardingPageContent />
+        </Suspense>
     );
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import FanWarsLogo from "@/components/fanwars-logo";
 import { supabase } from "@/lib/supabase";
 
-export default function LoginPage() {
+function LoginPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirect = searchParams.get("redirect");
@@ -259,3 +259,20 @@ export default function LoginPage() {
         </main>
     );
 }
+
+export default function LoginPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="flex min-h-screen items-center justify-center bg-[#fcfbf8]">
+                    <div className="text-sm font-semibold text-[#777286]">
+                        Loading FanWars...
+                    </div>
+                </main>
+            }
+        >
+            <LoginPageContent />
+        </Suspense>
+    );
+}
+
