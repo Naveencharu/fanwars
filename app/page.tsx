@@ -45,6 +45,10 @@ export default function HomePage() {
 
   const [battle, setBattle] = useState<Battle | null>(null);
 
+  const [displayName, setDisplayName] = useState("");
+  const [handler, setHandler] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
+
   const [options, setOptions] = useState<BattleOption[]>([]);
 
   const [results, setResults] = useState<BattleResult[]>([]);
@@ -53,9 +57,31 @@ export default function HomePage() {
 
   useEffect(() => {
     loadFeaturedBattle();
+    loadCurrentUser();
   }, []);
 
+  async function loadCurrentUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
+    if (!user) {
+      return;
+    }
+
+    setLoggedIn(true);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name, handler")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile) {
+      setDisplayName(profile.display_name);
+      setHandler(profile.handler);
+    }
+  }
   /* =======================================================
      LOAD REAL FEATURED BATTLE
      ======================================================= */
@@ -193,24 +219,47 @@ export default function HomePage() {
               How it works
             </a>
 
+            <Link
+              href="/create-fanwar"
+              className="transition hover:text-purple-600"
+            >
+              Create FanWar
+            </Link>
+
           </nav>
 
 
           <div className="flex items-center gap-2 sm:gap-3">
 
-            <Link
-              href="/login"
-              className="hidden px-3 py-2 text-sm font-bold text-[#625b70] transition hover:text-purple-600 sm:block"
-            >
-              Log in
-            </Link>
+            {loggedIn ? (
+              <Link
+                href="/profile"
+                className="rounded-full border border-purple-100 bg-white px-4 py-2 text-xs font-extrabold shadow-sm"
+              >
+                {displayName || "My Profile"}
+                {handler && (
+                  <span className="ml-2 text-[10px] text-[#81798e]">
+                    @{handler}
+                  </span>
+                )}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden px-3 py-2 text-sm font-bold text-[#625b70] transition hover:text-purple-600 sm:block"
+                >
+                  Log in
+                </Link>
 
-            <Link
-              href="/signup"
-              className="rounded-full bg-[#171525] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:px-5 sm:text-sm"
-            >
-              Join FanWars
-            </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-full bg-[#171525] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:px-5 sm:text-sm"
+                >
+                  Join FanWars
+                </Link>
+              </>
+            )}
 
           </div>
 

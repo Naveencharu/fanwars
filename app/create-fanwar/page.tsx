@@ -26,6 +26,7 @@ export default function CreateFanWarPage() {
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
+    const [submitted, setSubmitted] = useState(false);
 
     useEffect(() => {
         async function loadTribes() {
@@ -117,7 +118,7 @@ export default function CreateFanWarPage() {
                 throw new Error("FanWar was created but no battle ID was returned.");
             }
 
-            router.replace(`/battle/${battleId}`);
+            setSubmitted(true);
         } catch (err) {
             console.error("FanWar creation failed:", err);
             setError(
@@ -129,7 +130,61 @@ export default function CreateFanWarPage() {
             setCreating(false);
         }
     }
+    if (submitted) {
+        return (
+            <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
+                <AppHeader showBackToHome />
 
+                <section className="mx-auto flex min-h-[75vh] max-w-2xl items-center justify-center px-5 py-12 sm:px-8">
+                    <div className="w-full rounded-[2rem] border border-black/[0.06] bg-white p-8 text-center shadow-sm sm:p-12">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50 text-3xl">
+                            ✓
+                        </div>
+
+                        <p className="mt-6 text-xs font-black uppercase tracking-[0.16em] text-purple-600">
+                            FanWar Submitted
+                        </p>
+
+                        <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+                            Your FanWar is under review
+                        </h1>
+
+                        <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-[#686577]">
+                            Your FanWar has been submitted successfully. It will be
+                            reviewed before it becomes visible to the community.
+                        </p>
+
+                        <div className="mt-8 rounded-2xl bg-purple-50 p-5 text-left">
+                            <p className="text-sm font-extrabold text-purple-700">
+                                What happens next?
+                            </p>
+
+                            <p className="mt-2 text-sm leading-6 text-[#686577]">
+                                Our moderation team will review your FanWar. Once
+                                approved, it can go live and fans can start voting.
+                            </p>
+                        </div>
+
+                        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                            <Link
+                                href="/home"
+                                className="rounded-full bg-[#171525] px-6 py-3 text-sm font-extrabold text-white transition hover:opacity-90"
+                            >
+                                Back to Home
+                            </Link>
+
+                            <Link
+                                href="/create-fanwar"
+                                className="rounded-full border border-black/[0.08] bg-white px-6 py-3 text-sm font-extrabold"
+                            >
+                                Create Another FanWar
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        );
+    }
     return (
         <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
             <AppHeader showBackToHome />
