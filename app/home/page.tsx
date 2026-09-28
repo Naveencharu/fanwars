@@ -22,6 +22,7 @@ type Battle = {
     description: string | null;
     category: string;
     status: string;
+    image_url: string | null;
 };
 
 type BattleOption = {
@@ -112,7 +113,7 @@ export default function HomePage() {
                 const { data: battleData, error: battleError } =
                     await supabase
                         .from("battles")
-                        .select("id, title, description, category, status")
+                        .select("id, title, description, category, status, image_url")
                         .eq("status", "live")
                         .order("id", { ascending: true });
 
@@ -462,12 +463,26 @@ export default function HomePage() {
                                 return (
 
                                     <Link
-                                        key={battle.id}
-                                        href={`/battle/${battle.id}`}
-                                        className="group rounded-[2rem] border border-black/[0.06] bg-white p-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
-                                    >
+    key={battle.id}
+    href={`/battle/${battle.id}`}
+    className="group rounded-[2rem] border border-black/[0.06] bg-white p-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
+>
 
-                                        <div className="flex items-center justify-between gap-4">
+    {battle.image_url ? (
+        <div className="-mx-7 -mt-7 mb-6 overflow-hidden rounded-t-[2rem]">
+            <img
+                src={battle.image_url}
+                alt={battle.title}
+                className="h-44 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            />
+        </div>
+    ) : (
+        <div className="-mx-7 -mt-7 mb-6 flex h-44 items-center justify-center rounded-t-[2rem] bg-gradient-to-br from-purple-100 via-fuchsia-50 to-pink-100">
+            <span className="text-4xl">⚔️</span>
+        </div>
+    )}
+
+    <div className="flex items-center justify-between gap-4">
 
                                             <span className="rounded-full bg-pink-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-pink-600">
                                                 • LIVE

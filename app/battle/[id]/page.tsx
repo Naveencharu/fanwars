@@ -22,6 +22,7 @@ type Battle = {
     category: string;
     status: string;
     tribe_id: number | null;
+    image_url: string | null;
 };
 
 type BattleOption = {
@@ -117,7 +118,7 @@ export default function BattlePage() {
             } = await supabase
                 .from("battles")
                 .select(
-                    "id, title, description, category, status, tribe_id"
+                    "id, title, description, category, status, tribe_id, image_url"
                 )
                 .eq("id", battleId)
                 .single();
@@ -126,7 +127,27 @@ export default function BattlePage() {
             if (battleError) {
                 throw battleError;
             }
+            if (
+                battleData.status !== "live" &&
+                battleData.status !== "closed"
+            ) {
+                setBattle(null);
+                setOptions([]);
+                setResults([]);
+                setMyVote(null);
+                setCreator(null);
 
+                setMessage(
+                    battleData.status === "pending"
+                        ? "This FanWar is currently under review."
+                        : battleData.status === "rejected"
+                            ? "This FanWar was not approved."
+                            : "This FanWar is not currently available."
+                );
+
+                setMessageType("error");
+                return;
+            }
 
             /* -----------------------------------------------
                Options
@@ -279,7 +300,7 @@ export default function BattlePage() {
 
     useEffect(() => {
 
-        if (!battle) {
+        if (!battle || battle.status !== "live") {
             return;
         }
 
@@ -605,7 +626,23 @@ export default function BattlePage() {
         );
 
     }
+    const isClosed = battle.status === "closed";
 
+    const optionAResult = getResult(options[0]?.id);
+    const optionBResult = getResult(options[1]?.id);
+
+    const optionAVotes = Number(optionAResult?.vote_count ?? 0);
+    const optionBVotes = Number(optionBResult?.vote_count ?? 0);
+
+    const winnerOption =
+        isClosed && optionAVotes > optionBVotes
+            ? options[0]
+            : isClosed && optionBVotes > optionAVotes
+                ? options[1]
+                : null;
+
+    const isDraw =
+        isClosed && optionAVotes === optionBVotes;
 
     /* =======================================================
        MAIN
@@ -660,7 +697,15 @@ export default function BattlePage() {
                             {shareMessage}
                         </div>
                     )}
-
+                    {battle.image_url && (
+                        <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_30px_90px_rgba(55,35,100,0.14)]">
+                            <img
+                                src={battle.image_url}
+                                alt={battle.title}
+                                className="h-64 w-full object-cover sm:h-80 lg:h-[420px]"
+                            />
+                        </div>
+                    )}
 
                     {/* =================================================
               BATTLE TITLE
@@ -674,7 +719,9 @@ export default function BattlePage() {
 
                             {battle.status === "live"
                                 ? "LIVE"
-                                : battle.status}
+                                : battle.status === "closed"
+                                    ? "FINAL"
+                                    : battle.status}
 
                         </span>
 
@@ -718,7 +765,24 @@ export default function BattlePage() {
           ================================================= */}
 
                     <div className="mx-auto mt-10 max-w-5xl rounded-[2rem] border border-white/90 bg-white/90 p-6 shadow-[0_30px_90px_rgba(55,35,100,0.15)] backdrop-blur-xl sm:p-10">
+                        {isClosed && (
+                            <div className="mb-8 rounded-3xl border border-amber-200 bg-amber-50 px-6 py-6 text-center">
+                                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                                    FanWar Ended
+                                </p>
 
+                                <h2 className="mt-2 text-2xl font-black text-[#171525]">
+                                    {isDraw
+                                        ? "🤝 Final Result — Draw"
+                                        : `🏆 ${winnerOption?.name ?? "Winner"} Wins`}
+                                </h2>
+
+                                <p className="mt-2 text-sm font-bold text-[#686577]">
+                                    Final • {totalVotes}{" "}
+                                    {totalVotes === 1 ? "vote" : "votes"}
+                                </p>
+                            </div>
+                        )}
 
                         {/* =================================================
                 SIDES
@@ -735,6 +799,7 @@ export default function BattlePage() {
                                 totalVotes={totalVotes}
                                 myVote={myVote}
                                 voting={voting}
+                                closed={isClosed}
                                 onVote={handleVote}
                             />
 
@@ -758,6 +823,7 @@ export default function BattlePage() {
                                 totalVotes={totalVotes}
                                 myVote={myVote}
                                 voting={voting}
+                                closed={isClosed}
                                 onVote={handleVote}
                             />
 
@@ -941,6 +1007,7 @@ function BattleSide({
     totalVotes,
     myVote,
     voting,
+    closed,
     onVote,
 }: {
     option: BattleOption;
@@ -948,6 +1015,7 @@ function BattleSide({
     totalVotes: number;
     myVote: number | null;
     voting: boolean;
+    closed: boolean;
     onVote: (
         optionId: number
     ) => void;
@@ -1008,7 +1076,13 @@ function BattleSide({
           VOTE / LOCKED STATE
       ================================================= */}
 
-            {myVote === null ? (
+            {closed ? (
+
+                <div className="mt-7 w-full rounded-full bg-[#f3f1f5] px-5 py-4 text-center text-sm font-extrabold text-[#686577]">
+                    Voting Closed
+                </div>
+
+            ) : myVote === null ? (
 
                 <button
                     type="button"
@@ -1016,34 +1090,30 @@ function BattleSide({
                     disabled={voting}
                     className="mt-7 w-full rounded-full bg-[#171525] px-5 py-4 text-sm font-extrabold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                 >
-
                     {voting
                         ? "Recording..."
                         : `Choose ${option.name}`}
-
                 </button>
 
             ) : (
 
                 <div
                     className={`mt-7 w-full rounded-full px-5 py-4 text-center text-sm font-extrabold ${selected
-                        ? "bg-purple-600 text-white"
-                        : "bg-purple-50 text-purple-700"
+                            ? "bg-purple-600 text-white"
+                            : "bg-purple-50 text-purple-700"
                         }`}
                 >
-
                     {selected
                         ? "✓ Your side"
                         : "Other side"}
-
                 </div>
 
             )}
 
 
             {/* =================================================
-          RESULTS
-      ================================================= */}
+    RESULTS
+================================================= */}
 
             <div className="mt-7">
 
@@ -1056,8 +1126,7 @@ function BattleSide({
                             : "votes"}
                     </span>
 
-
-                    {myVote !== null && (
+                    {(myVote !== null || closed) && (
                         <span className="text-sm font-black text-purple-700">
                             {percentage}%
                         </span>
@@ -1065,10 +1134,9 @@ function BattleSide({
 
                 </div>
 
-
                 <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-purple-100">
 
-                    {myVote !== null && (
+                    {(myVote !== null || closed) && (
                         <div
                             className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-700"
                             style={{
@@ -1080,11 +1148,9 @@ function BattleSide({
                 </div>
 
             </div>
-
         </div>
     );
 }
-
 
 /* =========================================================
    TRIBE LOGO ROUTER

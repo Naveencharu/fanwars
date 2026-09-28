@@ -6,13 +6,20 @@ import { useEffect, useState } from "react";
 
 import AppHeader from "@/components/app-header";
 import { supabase } from "@/lib/supabase";
-
 type MemberPreview = {
     id: string;
     username: string;
     handler: string;
     display_name: string;
     avatar_url: string | null;
+};
+type ClanPreview = {
+    id: number;
+    name: string;
+    description: string | null;
+    image_url: string | null;
+    created_by: string;
+    member_count: number;
 };
 
 type LiveBattle = {
@@ -44,6 +51,8 @@ export default function TribeDetailPage() {
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState("");
+    const [clans, setClans] = useState<ClanPreview[]>([]);
+    const [clansLoading, setClansLoading] = useState(true);
 
     useEffect(() => {
         if (!tribeId) return;
@@ -70,7 +79,55 @@ export default function TribeDetailPage() {
                 }
 
                 setTribe(row as TribePage);
+                setClansLoading(true);
 
+                const { data: clanRows, error: clansError } = await supabase
+                    .from("clans")
+                    .select(`
+        id,
+        name,
+        description,
+        image_url,
+        created_by
+    `)
+                    .eq("tribe_id", tribeId)
+                    .eq("status", "active")
+                    .order("created_at", { ascending: true });
+
+                if (clansError) throw clansError;
+
+                const clanIds = (clanRows ?? []).map((clan) => clan.id);
+
+                let memberCounts: Record<number, number> = {};
+
+                if (clanIds.length > 0) {
+                    const { data: memberships, error: membershipsError } =
+                        await supabase
+                            .from("clan_members")
+                            .select("clan_id")
+                            .in("clan_id", clanIds);
+
+                    if (membershipsError) throw membershipsError;
+
+                    memberCounts = (memberships ?? []).reduce<Record<number, number>>(
+                        (counts, membership) => {
+                            counts[membership.clan_id] =
+                                (counts[membership.clan_id] ?? 0) + 1;
+
+                            return counts;
+                        },
+                        {}
+                    );
+                }
+
+                setClans(
+                    (clanRows ?? []).map((clan) => ({
+                        ...clan,
+                        member_count: memberCounts[clan.id] ?? 0,
+                    }))
+                );
+
+                setClansLoading(false);
                 const {
                     data: { user },
                 } = await supabase.auth.getUser();
@@ -97,6 +154,7 @@ export default function TribeDetailPage() {
                 );
             } finally {
                 setLoading(false);
+                setClansLoading(false);
             }
         }
 
@@ -270,15 +328,127 @@ export default function TribeDetailPage() {
 
                         <div className="col-span-2 border-t border-black/[0.06] px-5 py-5 text-center sm:col-span-1 sm:border-l sm:border-t-0">
                             <p className="text-2xl font-black text-purple-600">
-                                Active
+                                {clans.length}
                             </p>
+
                             <p className="mt-1 text-xs font-bold text-[#888393]">
-                                Community
+                                Clans
                             </p>
                         </div>
                     </div>
                 </section>
+                {/* Clans */}
+                <section className="mt-8">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                                Find Your Side
+                            </p>
 
+                            <h2 className="mt-1 text-2xl font-black text-[#171525]">
+                                Clans
+                            </h2>
+
+                            <p className="mt-2 max-w-xl text-sm leading-6 text-[#686577]">
+                                Join a clan inside {tribe.name}, or create one and rally fans around your side.
+                            </p>
+                        </div>
+
+                        {isMember ? (
+                            <Link
+                                href={`/create-clan?tribe=${tribe.id}`}
+                                className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#171525] px-5 py-3 text-sm font-extrabold text-white transition hover:opacity-90"
+                            >
+                                + Create Clan
+                            </Link>
+                        ) : (
+                            <span className="text-xs font-bold text-[#888393]">
+                                Join the Tribe to create a Clan
+                            </span>
+                        )}
+                    </div>
+
+                    {clansLoading ? (
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            {[1, 2].map((item) => (
+                                <div
+                                    key={item}
+                                    className="h-40 animate-pulse rounded-3xl bg-black/5"
+                                />
+                            ))}
+                        </div>
+                    ) : clans.length === 0 ? (
+                        <div className="mt-4 rounded-3xl border border-dashed border-black/10 bg-white p-8 text-center">
+                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-2xl">
+                                🛡️
+                            </div>
+
+                            <h3 className="mt-4 text-lg font-black text-[#171525]">
+                                No Clans yet
+                            </h3>
+
+                            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#686577]">
+                                Be the first to create a Clan inside {tribe.name}.
+                            </p>
+
+                            {isMember && (
+                                <Link
+                                    href={`/create-clan?tribe=${tribe.id}`}
+                                    className="mt-5 inline-flex rounded-full bg-purple-600 px-5 py-3 text-sm font-extrabold text-white transition hover:opacity-90"
+                                >
+                                    Create the First Clan
+                                </Link>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            {clans.map((clan) => (
+                                <Link
+                                    key={clan.id}
+                                    href={`/clans/${clan.id}`}
+                                    className="group rounded-3xl border border-black/[0.06] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+                                >
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-purple-100 text-2xl">
+                                            {clan.image_url ? (
+                                                <img
+                                                    src={clan.image_url}
+                                                    alt={clan.name}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            ) : (
+                                                "🛡️"
+                                            )}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="truncate text-lg font-black text-[#171525]">
+                                                {clan.name}
+                                            </h3>
+
+                                            <p className="mt-1 text-xs font-extrabold text-purple-600">
+                                                {clan.member_count}{" "}
+                                                {clan.member_count === 1
+                                                    ? "Member"
+                                                    : "Members"}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {clan.description && (
+                                        <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#686577]">
+                                            {clan.description}
+                                        </p>
+                                    )}
+
+                                    <div className="mt-4 text-sm font-extrabold text-purple-600">
+                                        View Clan →
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </section>
                 {/* Members */}
                 <section className="mt-8">
                     <div className="flex items-end justify-between">

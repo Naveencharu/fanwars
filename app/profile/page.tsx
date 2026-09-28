@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import AppHeader from "@/components/app-header";
 import FanWarsLogo from "@/components/fanwars-logo";
+import ImageUpload from "@/components/image-upload";
 import { supabase } from "@/lib/supabase";
 
 type Profile = {
@@ -14,6 +15,7 @@ type Profile = {
     handler: string;
     display_name: string;
     avatar_url: string | null;
+    banner_url: string | null;
     bio: string | null;
     created_at: string;
 };
@@ -31,18 +33,24 @@ type BattleHistory = {
     option_id: number;
     option_name: string;
 };
-
+type CreatedFanWar = {
+    id: number;
+    title: string;
+    description: string | null;
+    category: string;
+    status: string;
+    rejection_reason: string | null;
+    created_at: string;
+    tribe_id: number | null;
+};
 export default function ProfilePage() {
     const router = useRouter();
 
-    async function handleSignOut() {
-        await supabase.auth.signOut();
-        router.replace("/login");
-    }
 
     const [profile, setProfile] = useState<Profile | null>(null);
     const [tribes, setTribes] = useState<Tribe[]>([]);
     const [battleHistory, setBattleHistory] = useState<BattleHistory[]>([]);
+    const [createdFanWars, setCreatedFanWars] = useState<CreatedFanWar[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -67,7 +75,7 @@ export default function ProfilePage() {
         const { data: profileData, error: profileError } = await supabase
             .from("profiles")
             .select(
-                "id, username, handler, display_name, avatar_url, bio, created_at"
+                "id, username, handler, display_name, avatar_url, banner_url, bio, created_at"
             )
             .eq("id", user.id)
             .maybeSingle();
@@ -124,6 +132,15 @@ export default function ProfilePage() {
             setBattleHistory(historyData ?? []);
         }
 
+        const { data: createdData, error: createdError } =
+            await supabase.rpc("get_my_created_fanwars");
+
+        if (createdError) {
+            console.error("Created FanWars load failed:", createdError);
+        } else {
+            setCreatedFanWars(createdData ?? []);
+        }
+
         setLoading(false);
     }
 
@@ -172,23 +189,94 @@ export default function ProfilePage() {
 
                 {/* Profile Hero */}
                 <section className="overflow-hidden rounded-[30px] border border-black/[0.06] bg-white shadow-sm">
-                    <div className="h-32 bg-gradient-to-r from-purple-100 via-fuchsia-50 to-pink-100 sm:h-40" />
+                    {/* Cover */}
+                    <div className="relative h-52 sm:h-64">
+                        <ImageUpload
+                            userId={profile.id}
+                            folder="profile"
+                            currentUrl={profile.banner_url}
+                            aspect="cover"
+                            label="Add cover photo"
+                            className="h-full w-full"
+                            onUploaded={async (url) => {
+                                const { error: updateError } = await supabase
+                                    .from("profiles")
+                                    .update({
+                                        banner_url: url,
+                                    })
+                                    .eq("id", profile.id);
 
+                                if (updateError) {
+                                    console.error(
+                                        "Cover photo update failed:",
+                                        updateError
+                                    );
+                                    return;
+                                }
+
+                                setProfile((current) =>
+                                    current
+                                        ? {
+                                            ...current,
+                                            banner_url: url,
+                                        }
+                                        : current
+                                );
+                            }}
+                        />
+
+                        {!profile.banner_url && (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-r from-purple-100 via-fuchsia-50 to-pink-100">
+                                <p className="text-sm font-extrabold text-[#777286]">
+                                    Add a cover photo
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Identity */}
                     <div className="px-6 pb-7 sm:px-8">
-                        <div className="-mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
-                            <div className="flex items-end gap-4">
-                                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-gradient-to-br from-purple-500 to-pink-500 text-3xl font-black text-white shadow-lg sm:h-28 sm:w-28">
-                                    {profile.avatar_url ? (
-                                        <img
-                                            src={profile.avatar_url}
-                                            alt={profile.display_name}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    ) : (
-                                        profile.display_name.charAt(0).toUpperCase()
-                                    )}
+                        <div className="-mt-14 flex flex-col gap-5 sm:-mt-16 sm:flex-row sm:items-end sm:justify-between">
+                            <div className="flex items-end gap-5">
+                                {/* Avatar */}
+                                <div className="relative h-28 w-28 shrink-0 sm:h-32 sm:w-32">
+                                    <ImageUpload
+                                        userId={profile.id}
+                                        folder="profile"
+                                        currentUrl={profile.avatar_url}
+                                        aspect="square"
+                                        label="Add photo"
+                                        className="h-full w-full rounded-full border-4 border-white bg-gradient-to-br from-purple-500 to-pink-500 shadow-xl"
+                                        onUploaded={async (url) => {
+                                            const { error: updateError } =
+                                                await supabase
+                                                    .from("profiles")
+                                                    .update({
+                                                        avatar_url: url,
+                                                    })
+                                                    .eq("id", profile.id);
+
+                                            if (updateError) {
+                                                console.error(
+                                                    "Profile photo update failed:",
+                                                    updateError
+                                                );
+                                                return;
+                                            }
+
+                                            setProfile((current) =>
+                                                current
+                                                    ? {
+                                                        ...current,
+                                                        avatar_url: url,
+                                                    }
+                                                    : current
+                                            );
+                                        }}
+                                    />
                                 </div>
 
+                                {/* Identity text */}
                                 <div className="pb-1">
                                     <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
                                         {profile.display_name}
@@ -198,47 +286,35 @@ export default function ProfilePage() {
                                         @{profile.handler}
                                     </p>
 
-                                    <Link
-                                        href={`/u/${profile.handler}`}
-                                        className="mt-3 inline-flex rounded-full bg-[#171525] px-4 py-2 text-xs font-extrabold text-white transition hover:opacity-90"
-                                    >
-                                        View Public FanPage →
-                                    </Link>
+                                    {profile.bio && (
+                                        <p className="mt-2 max-w-xl text-sm leading-6 text-[#686577]">
+                                            {profile.bio}
+                                        </p>
+                                    )}
                                 </div>
-
-                                <Link
-                                    href="/home"
-                                    className="hidden rounded-full bg-[#171525] px-5 py-2.5 text-sm font-extrabold text-white transition hover:opacity-90 sm:inline-flex"
-                                >
-                                    Back to Home
-                                </Link>
-                                <button
-                                    type="button"
-                                    onClick={handleSignOut}
-                                    className="rounded-full border border-red-200 bg-white px-5 py-2.5 text-sm font-extrabold text-red-600 transition hover:bg-red-50"
-                                >
-                                    Sign out
-                                </button>
                             </div>
 
-                            {profile.bio && (
-                                <p className="mt-6 max-w-2xl text-sm leading-6 text-[#686577]">
-                                    {profile.bio}
-                                </p>
-                            )}
+                            <Link
+                                href={`/u/${profile.handler}`}
+                                className="inline-flex shrink-0 rounded-full bg-[#171525] px-5 py-2.5 text-sm font-extrabold text-white transition hover:opacity-90"
+                            >
+                                View Public FanPage →
+                            </Link>
+                        </div>
 
-                            <div className="mt-6 flex flex-wrap gap-2">
-                                <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
-                                    FanWars member
-                                </span>
+                        {/* Profile metadata */}
+                        <div className="mt-6 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+                                FanWars member
+                            </span>
 
-                                <span className="rounded-full bg-black/[0.04] px-3 py-1.5 text-xs font-bold text-[#686577]">
-                                    Joined {memberSince}
-                                </span>
-                            </div>
+                            <span className="rounded-full bg-black/[0.04] px-3 py-1.5 text-xs font-bold text-[#686577]">
+                                Joined {memberSince}
+                            </span>
                         </div>
                     </div>
                 </section>
+
 
                 {/* Stats */}
                 <section className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -337,74 +413,146 @@ export default function ProfilePage() {
 
                 {/* Battle History */}
                 <section className="mt-10">
-                    <div className="mb-4">
-                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
-                            Your record
-                        </p>
+                    <div className="mb-4 flex items-end justify-between gap-4">
+                        <div>
+                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                                Your creations
+                            </p>
 
-                        <h2 className="mt-1 text-2xl font-black tracking-tight">
-                            Battle History
-                        </h2>
+                            <h2 className="mt-1 text-2xl font-black tracking-tight">
+                                Created FanWars
+                            </h2>
+                        </div>
+
+                        <Link
+                            href="/create-fanwar"
+                            className="text-sm font-extrabold text-purple-600 hover:text-purple-700"
+                        >
+                            Create FanWar →
+                        </Link>
                     </div>
 
-                    {battleHistory.length === 0 ? (
+                    {createdFanWars.length === 0 ? (
                         <div className="rounded-[24px] border border-dashed border-black/[0.10] bg-white p-8 text-center">
-                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-purple-50">
-                                <FanWarsLogo href="/" showName={false} size="md" />
-                            </div>
-
-                            <h3 className="mt-4 text-lg font-black">
-                                No battles yet
+                            <h3 className="text-lg font-black">
+                                No FanWars created yet
                             </h3>
 
                             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#777286]">
-                                Enter a live FanWar, choose your side, and your verified vote
-                                will appear here.
+                                Create a FanWar and build your first community battle.
                             </p>
 
                             <Link
-                                href="/home"
+                                href="/create-fanwar"
                                 className="mt-5 inline-flex rounded-full bg-[#171525] px-5 py-2.5 text-sm font-extrabold text-white"
                             >
-                                Explore FanWars
+                                Create FanWar
                             </Link>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {battleHistory.map((battle, index) => (
-                                <Link
-                                    key={`${battle.battle_id}-${battle.option_id}-${index}`}
-                                    href={`/battle/${battle.battle_id}`}
-                                    className="group flex items-center justify-between gap-4 rounded-[22px] border border-black/[0.06] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-700">
-                                                {battle.category}
-                                            </span>
+                            {createdFanWars.map((fanWar) => {
+                                const statusLabel =
+                                    fanWar.status === "pending"
+                                        ? "Under Review"
+                                        : fanWar.status === "live"
+                                            ? "Live"
+                                            : fanWar.status === "rejected"
+                                                ? "Rejected"
+                                                : fanWar.status;
 
-                                            <span className="text-xs font-semibold text-[#9993a3]">
-                                                FanWar #{battle.battle_id}
-                                            </span>
+                                const statusClass =
+                                    fanWar.status === "pending"
+                                        ? "bg-amber-50 text-amber-700"
+                                        : fanWar.status === "live"
+                                            ? "bg-green-50 text-green-700"
+                                            : fanWar.status === "rejected"
+                                                ? "bg-red-50 text-red-700"
+                                                : "bg-black/[0.05] text-[#686577]";
+
+                                const content = (
+                                    <div
+                                        className={`rounded-[22px] border border-black/[0.06] bg-white p-5 shadow-sm ${fanWar.status === "live"
+                                            ? "transition hover:-translate-y-0.5 hover:shadow-md"
+                                            : ""
+                                            }`}
+                                    >
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-700">
+                                                        {fanWar.category}
+                                                    </span>
+
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${statusClass}`}
+                                                    >
+                                                        {statusLabel}
+                                                    </span>
+
+                                                    <span className="text-xs font-semibold text-[#9993a3]">
+                                                        FanWar #{fanWar.id}
+                                                    </span>
+                                                </div>
+
+                                                <h3 className="mt-2 text-base font-black">
+                                                    {fanWar.title}
+                                                </h3>
+
+                                                <p className="mt-1 text-xs text-[#9993a3]">
+                                                    Created{" "}
+                                                    {new Date(
+                                                        fanWar.created_at
+                                                    ).toLocaleDateString(undefined, {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        year: "numeric",
+                                                    })}
+                                                </p>
+
+                                                {fanWar.status === "pending" && (
+                                                    <p className="mt-3 text-sm leading-6 text-[#777286]">
+                                                        Your FanWar is under moderation review and
+                                                        will become visible after approval.
+                                                    </p>
+                                                )}
+
+                                                {fanWar.status === "rejected" &&
+                                                    fanWar.rejection_reason && (
+                                                        <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3">
+                                                            <p className="text-xs font-extrabold uppercase tracking-wider text-red-600">
+                                                                Rejection reason
+                                                            </p>
+
+                                                            <p className="mt-1 text-sm leading-5 text-red-800">
+                                                                {fanWar.rejection_reason}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                            </div>
+
+                                            {fanWar.status === "live" && (
+                                                <span className="shrink-0 text-lg font-black text-purple-600">
+                                                    →
+                                                </span>
+                                            )}
                                         </div>
-
-                                        <h3 className="mt-2 truncate text-base font-black">
-                                            {battle.battle_title}
-                                        </h3>
-
-                                        <p className="mt-1 text-sm text-[#777286]">
-                                            You voted for{" "}
-                                            <span className="font-extrabold text-[#171525]">
-                                                {battle.option_name}
-                                            </span>
-                                        </p>
                                     </div>
+                                );
 
-                                    <span className="shrink-0 text-lg font-black text-purple-600 transition group-hover:translate-x-1">
-                                        →
-                                    </span>
-                                </Link>
-                            ))}
+                                return fanWar.status === "live" ? (
+                                    <Link
+                                        key={fanWar.id}
+                                        href={`/battle/${fanWar.id}`}
+                                    >
+                                        {content}
+                                    </Link>
+                                ) : (
+                                    <div key={fanWar.id}>
+                                        {content}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </section>
