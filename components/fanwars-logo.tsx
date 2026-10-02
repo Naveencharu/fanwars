@@ -122,7 +122,7 @@ export default function FanWarsLogo({
             aria-label="FanWars"
         >
             <span
-                className={`${s.circle} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#a855f7] via-[#c044df] to-[#ec4899]`}
+                className={`${s.circle} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#b5123b] via-[#d42350] to-[#f43f5e]`}
             >
                 <FanWarsMark className={`${s.icon} text-white`} />
             </span>

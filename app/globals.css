@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* FanWars crimson: shared by buttons, badges, cards, gradients and focus rings. */
+@theme {
+  --color-brand-50: #fff1f4;
+  --color-brand-100: #ffe1e8;
+  --color-brand-200: #ffc3d1;
+  --color-brand-300: #ff95af;
+  --color-brand-400: #f85e86;
+  --color-brand-500: #df285a;
+  --color-brand-600: #b5123b;
+  --color-brand-700: #991034;
+  --color-brand-800: #7f1230;
+  --color-brand-900: #68132c;
+  --color-brand-950: #3c0717;
+}
+
 :root {
   --background: #fcfbf8;
   --foreground: #171525;
@@ -26,6 +41,6 @@ a {
 }
 
 ::selection {
-  background: #e9d5ff;
+  background: #ffc3d1;
   color: #171525;
 }

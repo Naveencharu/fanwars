@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import AppHeader from "@/components/app-header";
 import FanWarsLogo from "@/components/fanwars-logo";
+import BattleCover, { SidePhoto } from "@/components/battle-cover";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Profile = {
@@ -14,6 +17,7 @@ type Tribe = {
     id: number;
     name: string;
     description: string | null;
+    image_url: string | null;
 };
 
 type Battle = {
@@ -33,6 +37,7 @@ type BattleOption = {
 };
 
 export default function HomePage() {
+    const router = useRouter();
     const [profile, setProfile] = useState<Profile | null>(null);
     const [tribes, setTribes] = useState<Tribe[]>([]);
     const [battles, setBattles] = useState<Battle[]>([]);
@@ -48,10 +53,13 @@ export default function HomePage() {
 
                 const {
                     data: { user },
+                    error: authError,
                 } = await supabase.auth.getUser();
 
+                if (authError && authError.name !== "AuthSessionMissingError") throw authError;
+
                 if (!user) {
-                    window.location.href = "/login";
+                    router.replace("/login?redirect=/home");
                     return;
                 }
 
@@ -69,7 +77,7 @@ export default function HomePage() {
                 }
 
                 if (!profileData) {
-                    window.location.href = "/onboarding";
+                    router.replace("/onboarding?redirect=/home");
                     return;
                 }
 
@@ -95,7 +103,7 @@ export default function HomePage() {
                     const { data: tribeData, error: tribeError } =
                         await supabase
                             .from("tribes")
-                            .select("id, name, description")
+                            .select("id, name, description, image_url")
                             .in("id", tribeIds)
                             .order("id", { ascending: true });
 
@@ -162,16 +170,12 @@ export default function HomePage() {
         }
 
         loadHome();
-    }, []);
+    }, [router]);
 
     if (loading) {
         return (
             <main className="min-h-screen bg-[#fcfbf8]">
-                <header className="border-b border-black/[0.06] bg-white">
-                    <div className="mx-auto flex h-16 max-w-7xl items-center px-5 sm:px-8">
-                        <FanWarsLogo href="/" size="md" />
-                    </div>
-                </header>
+                <AppHeader />
 
                 <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
                     <div className="h-64 animate-pulse rounded-[2rem] bg-white ring-1 ring-black/[0.05]" />
@@ -183,11 +187,7 @@ export default function HomePage() {
     if (error) {
         return (
             <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-                <header className="border-b border-black/[0.06] bg-white">
-                    <div className="mx-auto flex h-16 max-w-7xl items-center px-5 sm:px-8">
-                        <FanWarsLogo href="/" size="md" />
-                    </div>
-                </header>
+                <AppHeader />
 
                 <div className="mx-auto max-w-2xl px-5 py-16 sm:px-8">
                     <div className="rounded-[2rem] border border-red-100 bg-red-50 p-8 text-center">
@@ -217,101 +217,7 @@ export default function HomePage() {
 
             {/* HEADER */}
 
-            <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-white/95 backdrop-blur">
-                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
-
-                    <FanWarsLogo href="/" size="md" />
-
-                    {/* Desktop Navigation */}
-
-                    <nav className="hidden items-center gap-8 md:flex">
-
-                        <Link
-                            href="/home"
-                            className="text-sm font-extrabold text-purple-600"
-                        >
-                            Home
-                        </Link>
-
-                        <Link
-                            href="/tribes"
-                            className="text-sm font-bold text-[#686577] transition hover:text-[#171525]"
-                        >
-                            Tribes
-                        </Link>
-
-                        <Link
-                            href="/rankings"
-                            className="text-sm font-bold text-[#686577] transition hover:text-[#171525]"
-                        >
-                            Rankings
-                        </Link>
-
-                        <Link
-                            href="/profile"
-                            className="text-sm font-bold text-[#686577] transition hover:text-[#171525]"
-                        >
-                            Profile
-                        </Link>
-
-                    </nav>
-
-                    {/* Profile Identity */}
-
-                    {profile && (
-                        <Link
-                            href="/profile"
-                            className="group rounded-2xl px-3 py-2 text-right transition hover:bg-[#f7f5ff]"
-                            aria-label="Open your FanPage"
-                        >
-                            <div className="text-sm font-black group-hover:text-purple-600">
-                                {profile.display_name}
-                            </div>
-
-                            <div className="text-xs font-semibold text-[#9a97a5]">
-                                @{profile.handler}
-                            </div>
-                        </Link>
-                    )}
-
-                </div>
-
-                {/* Mobile Navigation */}
-
-                <div className="border-t border-black/[0.05] md:hidden">
-                    <nav className="mx-auto flex max-w-7xl items-center justify-center gap-7 px-5 py-3">
-
-                        <Link
-                            href="/home"
-                            className="text-xs font-extrabold text-purple-600"
-                        >
-                            Home
-                        </Link>
-
-                        <Link
-                            href="/tribes"
-                            className="text-xs font-bold text-[#686577]"
-                        >
-                            Tribes
-                        </Link>
-
-                        <Link
-                            href="/rankings"
-                            className="text-xs font-bold text-[#686577]"
-                        >
-                            Rankings
-                        </Link>
-
-                        <Link
-                            href="/profile"
-                            className="text-xs font-bold text-[#686577]"
-                        >
-                            Profile
-                        </Link>
-
-                    </nav>
-                </div>
-            </header>
+            <AppHeader />
 
             {/* MAIN */}
 
@@ -319,11 +225,12 @@ export default function HomePage() {
 
                 {/* Welcome */}
 
-                <section className="rounded-[2rem] bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 px-7 py-10 sm:px-10 sm:py-12">
+                <section className="grid overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand-50 via-rose-50 to-orange-50 md:grid-cols-[3fr_2fr]">
+                    <div className="px-7 py-10 sm:px-10 sm:py-12">
 
                     <div className="max-w-4xl">
 
-                        <div className="text-xs font-black uppercase tracking-[0.16em] text-purple-600">
+                        <div className="text-xs font-black uppercase tracking-[0.16em] text-brand-600">
                             Your FanWars
                         </div>
 
@@ -345,11 +252,13 @@ export default function HomePage() {
 
                     </div>
 
+                    </div>
+                    <div className="h-48 md:h-full md:min-h-64"><SidePhoto name={tribes[0]?.name || "Fans coming together"} description={tribes[0]?.description} image={tribes.length ? tribes[0].image_url : "/battle-covers/fan-movement.jpg"} showLabel={false} sizes="(max-width: 768px) 100vw, 40vw" /></div>
                 </section>
 
                 {/* TRIBES */}
 
-                <section className="mt-10">
+                <section id="your-tribes" className="mt-10 scroll-mt-28">
 
                     <div className="flex items-end justify-between gap-4">
 
@@ -367,7 +276,7 @@ export default function HomePage() {
 
                         <Link
                             href="/tribes"
-                            className="text-sm font-extrabold text-purple-600 transition hover:text-purple-700"
+                            className="text-sm font-extrabold text-brand-600 transition hover:text-brand-700"
                         >
                             Explore tribes →
                         </Link>
@@ -379,7 +288,7 @@ export default function HomePage() {
                         <div className="mt-5 rounded-[2rem] border border-black/[0.06] bg-white p-7">
 
                             <p className="text-sm font-semibold text-[#777384]">
-                                You haven't joined any tribes yet.
+                                You haven&apos;t joined any tribes yet.
                             </p>
 
                             <Link
@@ -397,12 +306,13 @@ export default function HomePage() {
 
                             {tribes.map((tribe) => (
 
-                                <div
+                                <Link
                                     key={tribe.id}
-                                    className="rounded-full border border-purple-100 bg-white px-5 py-3 text-sm font-extrabold shadow-sm"
+                                    href={`/tribes/${tribe.id}?from=home`}
+                                    className="rounded-full border border-brand-100 bg-white px-5 py-3 text-sm font-extrabold shadow-sm transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                                 >
                                     {tribe.name}
-                                </div>
+                                </Link>
 
                             ))}
 
@@ -468,23 +378,13 @@ export default function HomePage() {
     className="group rounded-[2rem] border border-black/[0.06] bg-white p-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
 >
 
-    {battle.image_url ? (
-        <div className="-mx-7 -mt-7 mb-6 overflow-hidden rounded-t-[2rem]">
-            <img
-                src={battle.image_url}
-                alt={battle.title}
-                className="h-44 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-            />
-        </div>
-    ) : (
-        <div className="-mx-7 -mt-7 mb-6 flex h-44 items-center justify-center rounded-t-[2rem] bg-gradient-to-br from-purple-100 via-fuchsia-50 to-pink-100">
-            <span className="text-4xl">⚔️</span>
-        </div>
-    )}
+    <div className="-mx-7 -mt-7 mb-6 overflow-hidden rounded-t-[2rem]">
+        <BattleCover title={battle.title} imageUrl={battle.image_url} optionNames={battleOptions.map(option => option.name)} />
+    </div>
 
     <div className="flex items-center justify-between gap-4">
 
-                                            <span className="rounded-full bg-pink-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-pink-600">
+                                            <span className="rounded-full bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-rose-600">
                                                 • LIVE
                                             </span>
 
@@ -525,7 +425,7 @@ export default function HomePage() {
 
                                         <div className="mt-7 flex items-center justify-between">
 
-                                            <span className="text-sm font-extrabold text-purple-600">
+                                            <span className="text-sm font-extrabold text-brand-600">
                                                 Enter FanWar
                                             </span>
 
@@ -568,7 +468,7 @@ export default function HomePage() {
                             View your identity, tribes and FanWar history.
                         </p>
 
-                        <div className="mt-4 text-sm font-extrabold text-purple-600">
+                        <div className="mt-4 text-sm font-extrabold text-brand-600">
                             View profile →
                         </div>
 
@@ -591,7 +491,7 @@ export default function HomePage() {
                             See which sides are leading the live FanWars.
                         </p>
 
-                        <div className="mt-4 text-sm font-extrabold text-purple-600">
+                        <div className="mt-4 text-sm font-extrabold text-brand-600">
                             View rankings →
                         </div>
 
@@ -614,7 +514,7 @@ export default function HomePage() {
                             Discover passions and join new communities.
                         </p>
 
-                        <div className="mt-4 text-sm font-extrabold text-purple-600">
+                        <div className="mt-4 text-sm font-extrabold text-brand-600">
                             Explore tribes →
                         </div>
 

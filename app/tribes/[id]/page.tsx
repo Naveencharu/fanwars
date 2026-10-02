@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import AppHeader from "@/components/app-header";
+import BattleCover, { SidePhoto } from "@/components/battle-cover";
 import { supabase } from "@/lib/supabase";
 type MemberPreview = {
     id: string;
@@ -30,6 +31,7 @@ type LiveBattle = {
     status: string;
     starts_at: string | null;
     ends_at: string | null;
+    image_url?: string | null;
 };
 
 type TribePage = {
@@ -44,6 +46,10 @@ type TribePage = {
 
 export default function TribeDetailPage() {
     const params = useParams<{ id: string }>();
+    const searchParams = useSearchParams();
+    const fromHome = searchParams.get("from") === "home";
+    const backHref = fromHome ? "/home#your-tribes" : "/tribes";
+    const backLabel = fromHome ? "Back to Home" : "Back to Tribes";
     const tribeId = Number(params.id);
 
     const [tribe, setTribe] = useState<TribePage | null>(null);
@@ -78,7 +84,12 @@ export default function TribeDetailPage() {
                     return;
                 }
 
-                setTribe(row as TribePage);
+                const page = row as TribePage;
+                const { data: covers } = page.live_battles.length ? await supabase.from("battles")
+                    .select("id, image_url").in("id", page.live_battles.map(battle => battle.id)) : { data: [] };
+                setTribe({ ...page, live_battles: page.live_battles.map(battle => ({ ...battle,
+                    image_url: covers?.find(cover => cover.id === battle.id)?.image_url ?? null,
+                })) });
                 setClansLoading(true);
 
                 const { data: clanRows, error: clansError } = await supabase
@@ -241,10 +252,10 @@ export default function TribeDetailPage() {
                     </p>
 
                     <Link
-                        href="/tribes"
+                        href={backHref}
                         className="mt-6 inline-flex rounded-full bg-[#171525] px-5 py-3 text-sm font-extrabold text-white"
                     >
-                        ← Back to Tribes
+                        ← {backLabel}
                     </Link>
                 </div>
             </main>
@@ -257,31 +268,32 @@ export default function TribeDetailPage() {
 
             <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
                 <Link
-                    href="/tribes"
+                    href={backHref}
                     className="text-sm font-bold text-[#686577] transition hover:text-[#171525]"
                 >
-                    ← Back to Tribes
+                    ← {backLabel}
                 </Link>
 
                 {/* Tribe Hero */}
                 <section className="mt-5 overflow-hidden rounded-[2rem] border border-black/[0.06] bg-white shadow-sm">
-                    <div className="bg-gradient-to-br from-purple-100 via-white to-pink-100 px-6 py-10 sm:px-10 sm:py-12">
-                        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative isolate overflow-hidden px-6 py-10 sm:px-10 sm:py-12">
+                        <div className="absolute inset-0 -z-10">
+                            <SidePhoto name={tribe.name} description={tribe.description} image={tribe.image_url} showLabel={false} sizes="(max-width: 1024px) 100vw, 1024px" />
+                            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-black/10" />
+                        </div>
+                        <div className="flex min-h-48 flex-col justify-end gap-6 sm:flex-row sm:items-end sm:justify-between">
                             <div className="flex items-center gap-5">
-                                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white text-4xl shadow-sm">
-                                    🔥
-                                </div>
 
                                 <div>
-                                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-purple-600">
+                                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/80">
                                         FanWars Tribe
                                     </p>
 
-                                    <h1 className="mt-1 text-3xl font-black tracking-tight text-[#171525] sm:text-4xl">
+                                    <h1 className="mt-2 text-3xl font-black tracking-tight text-white drop-shadow-lg sm:text-4xl">
                                         {tribe.name}
                                     </h1>
 
-                                    <p className="mt-2 max-w-xl text-sm leading-6 text-[#686577]">
+                                    <p className="mt-3 max-w-xl text-sm leading-6 text-white/90 drop-shadow-md">
                                         {tribe.description ||
                                             `A community for fans of ${tribe.name}.`}
                                     </p>
@@ -293,7 +305,7 @@ export default function TribeDetailPage() {
                                 onClick={handleJoin}
                                 disabled={joining || isMember}
                                 className={`rounded-full px-6 py-3 text-sm font-extrabold transition ${isMember
-                                    ? "bg-purple-100 text-purple-700"
+                                    ? "bg-brand-100 text-brand-700"
                                     : "bg-[#171525] text-white hover:opacity-90"
                                     }`}
                             >
@@ -327,7 +339,7 @@ export default function TribeDetailPage() {
                         </div>
 
                         <div className="col-span-2 border-t border-black/[0.06] px-5 py-5 text-center sm:col-span-1 sm:border-l sm:border-t-0">
-                            <p className="text-2xl font-black text-purple-600">
+                            <p className="text-2xl font-black text-brand-600">
                                 {clans.length}
                             </p>
 
@@ -341,7 +353,7 @@ export default function TribeDetailPage() {
                 <section className="mt-8">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                                 Find Your Side
                             </p>
 
@@ -354,6 +366,8 @@ export default function TribeDetailPage() {
                             </p>
                         </div>
 
+                        <div className="flex flex-wrap items-center gap-3">
+                        {clans.length >= 2 && <Link href={`/tribes/${tribe.id}/challenge`} className="inline-flex items-center justify-center rounded-full border border-brand-200 bg-brand-50 px-5 py-3 text-sm font-extrabold text-brand-700 hover:bg-brand-100">Challenge a Clan</Link>}
                         {isMember ? (
                             <Link
                                 href={`/create-clan?tribe=${tribe.id}`}
@@ -366,6 +380,7 @@ export default function TribeDetailPage() {
                                 Join the Tribe to create a Clan
                             </span>
                         )}
+                        </div>
                     </div>
 
                     {clansLoading ? (
@@ -379,7 +394,7 @@ export default function TribeDetailPage() {
                         </div>
                     ) : clans.length === 0 ? (
                         <div className="mt-4 rounded-3xl border border-dashed border-black/10 bg-white p-8 text-center">
-                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-2xl">
+                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-2xl">
                                 🛡️
                             </div>
 
@@ -394,7 +409,7 @@ export default function TribeDetailPage() {
                             {isMember && (
                                 <Link
                                     href={`/create-clan?tribe=${tribe.id}`}
-                                    className="mt-5 inline-flex rounded-full bg-purple-600 px-5 py-3 text-sm font-extrabold text-white transition hover:opacity-90"
+                                    className="mt-5 inline-flex rounded-full bg-brand-600 px-5 py-3 text-sm font-extrabold text-white transition hover:opacity-90"
                                 >
                                     Create the First Clan
                                 </Link>
@@ -408,25 +423,17 @@ export default function TribeDetailPage() {
                                     href={`/clans/${clan.id}`}
                                     className="group rounded-3xl border border-black/[0.06] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
                                 >
+                                    <div className="-mx-5 -mt-5 mb-5 h-40 overflow-hidden rounded-t-3xl">
+                                        <SidePhoto name={clan.name} description={clan.description} parentTopic={tribe.name} image={clan.image_url} showLabel={false} />
+                                    </div>
                                     <div className="flex items-start gap-4">
-                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-purple-100 text-2xl">
-                                            {clan.image_url ? (
-                                                <img
-                                                    src={clan.image_url}
-                                                    alt={clan.name}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            ) : (
-                                                "🛡️"
-                                            )}
-                                        </div>
 
                                         <div className="min-w-0 flex-1">
                                             <h3 className="truncate text-lg font-black text-[#171525]">
                                                 {clan.name}
                                             </h3>
 
-                                            <p className="mt-1 text-xs font-extrabold text-purple-600">
+                                            <p className="mt-1 text-xs font-extrabold text-brand-600">
                                                 {clan.member_count}{" "}
                                                 {clan.member_count === 1
                                                     ? "Member"
@@ -441,7 +448,7 @@ export default function TribeDetailPage() {
                                         </p>
                                     )}
 
-                                    <div className="mt-4 text-sm font-extrabold text-purple-600">
+                                    <div className="mt-4 text-sm font-extrabold text-brand-600">
                                         View Clan →
                                     </div>
                                 </Link>
@@ -453,7 +460,7 @@ export default function TribeDetailPage() {
                 <section className="mt-8">
                     <div className="flex items-end justify-between">
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                                 Community
                             </p>
                             <h2 className="mt-1 text-2xl font-black text-[#171525]">
@@ -480,7 +487,7 @@ export default function TribeDetailPage() {
                                     href={`/u/${member.handler}`}
                                     className="flex items-center gap-3 rounded-2xl border border-black/[0.06] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
                                 >
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-purple-100 text-sm font-black text-purple-700">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-sm font-black text-brand-700">
                                         {member.avatar_url ? (
                                             <img
                                                 src={member.avatar_url}
@@ -509,7 +516,7 @@ export default function TribeDetailPage() {
 
                 {/* FanWars */}
                 <section className="mt-8">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                         Competition
                     </p>
 
@@ -531,7 +538,10 @@ export default function TribeDetailPage() {
                                     href={`/battle/${battle.id}`}
                                     className="rounded-2xl border border-black/[0.06] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
                                 >
-                                    <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                                    <div className="-mx-5 -mt-5 mb-4 overflow-hidden rounded-t-2xl">
+                                    <BattleCover title={battle.title} imageUrl={battle.image_url ?? null} parentTopic={tribe.name} compact />
+                                    </div>
+                                    <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-600">
                                         {battle.category}
                                     </p>
 
@@ -545,7 +555,7 @@ export default function TribeDetailPage() {
                                         </p>
                                     )}
 
-                                    <div className="mt-4 text-sm font-extrabold text-purple-600">
+                                    <div className="mt-4 text-sm font-extrabold text-brand-600">
                                         Enter FanWar →
                                     </div>
                                 </Link>

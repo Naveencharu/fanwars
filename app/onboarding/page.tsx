@@ -3,11 +3,13 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthDestination } from "@/lib/auth-redirect";
 
 function OnboardingPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const ref = searchParams.get("ref");
+    const redirect = searchParams.get("redirect");
     const [username, setUsername] = useState("");
     const [handler, setHandler] = useState("");
     const [displayName, setDisplayName] = useState("");
@@ -35,6 +37,7 @@ function OnboardingPageContent() {
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (saving) return;
 
         setError("");
 
@@ -66,64 +69,82 @@ function OnboardingPageContent() {
 
         setSaving(true);
 
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
+        try {
+            const {
+                data: { user },
+                error: authError,
+            } = await supabase.auth.getUser();
 
-        if (!user) {
-            setSaving(false);
-            setError("Your session has expired. Please log in again.");
-            return;
-        }
-
-        const { error: profileError } = await supabase
-            .from("profiles")
-            .insert({
-                id: user.id,
-                username: cleanUsername,
-                handler: cleanHandler,
-                display_name: cleanDisplayName,
-            });
-
-        setSaving(false);
-
-        if (profileError) {
-            if (profileError.code === "23505") {
-                setError(
-                    "That username or handler is already taken. Please choose another."
-                );
-            } else {
-                setError(profileError.message);
+            if (authError || !user) {
+                throw new Error("Your session has expired. Please log in again.");
             }
 
-            return;
-        }
+            // A retry must not insert a second profile after a successful save.
+            const { data: existingProfile, error: lookupError } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("id", user.id)
+                .maybeSingle();
 
-        if (ref) {
-            const { error: referralError } = await supabase.rpc(
-                "claim_referral",
-                {
-                    p_referral_handler: ref,
-                    p_source_type: "onboarding",
-                    p_source_id: null,
+            if (lookupError) throw lookupError;
+
+            if (!existingProfile) {
+                const { error: profileError } = await supabase
+                    .from("profiles")
+                    .insert({
+                        id: user.id,
+                        username: cleanUsername,
+                        handler: cleanHandler,
+                        display_name: cleanDisplayName,
+                    });
+
+                if (profileError) {
+                    if (profileError.code === "23505") {
+                        throw new Error(
+                            "That username or handler is already taken. Please choose another."
+                        );
+                    } else {
+                        throw profileError;
+                    }
                 }
-            );
-
-            if (referralError) {
-                console.error("Referral attribution failed:", referralError);
-                setError(`Referral attribution failed: ${referralError.message}`);
-                setSaving(false);
-                return;
             }
-        }
 
-        router.push("/tribes");
+            if (ref) {
+                try {
+                    const { error: referralError } = await supabase.rpc(
+                        "claim_referral",
+                        {
+                            p_referral_handler: ref,
+                            p_source_type: "onboarding",
+                            p_source_id: null,
+                        }
+                    );
+
+                    if (referralError) {
+                        throw referralError;
+                    }
+                } catch (referralError) {
+                    // Attribution failure must not block an account already created.
+                    console.error("Referral attribution failed:", referralError);
+                }
+            }
+
+            router.replace(getAuthDestination(redirect, ref, window.location.origin));
+        } catch (submitError) {
+            setError(
+                submitError instanceof Error
+                    ? submitError.message
+                    : "We couldn't complete your profile. Please try again."
+            );
+        } finally {
+            setSaving(false);
+        }
     };
 
 
     if (loading) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-[#faf9ff]">
+            <main className="flex min-h-screen items-center justify-center bg-[#fff5f7]">
                 <div className="text-sm font-semibold text-slate-500">
                     Loading your FanWars identity...
                 </div>
@@ -132,12 +153,12 @@ function OnboardingPageContent() {
     }
 
     return (
-        <main className="min-h-screen bg-[#faf9ff] text-slate-950">
+        <main className="min-h-screen bg-[#fff5f7] text-slate-950">
             <section className="flex min-h-screen items-center justify-center px-6 py-12">
                 <div className="w-full max-w-lg">
                     <div className="mb-8 text-center">
-                        <div className="mb-4 inline-flex rounded-full bg-violet-100 px-4 py-2 text-sm font-bold text-violet-700">
-                            ⚔️ Step 1 of 2
+                        <div className="mb-4 inline-flex rounded-full bg-brand-100 px-4 py-2 text-sm font-bold text-brand-700">
+                            ⚔️ Your fan identity
                         </div>
 
                         <h1 className="text-4xl font-black tracking-tight">
@@ -166,7 +187,7 @@ function OnboardingPageContent() {
                                     onChange={(event) => setUsername(event.target.value)}
                                     placeholder="NaveenC"
                                     maxLength={30}
-                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-violet-500 focus:bg-white"
+                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-brand-500 focus:bg-white"
                                     required
                                 />
 
@@ -183,7 +204,7 @@ function OnboardingPageContent() {
                                     FanWars Handler
                                 </label>
 
-                                <div className="flex overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-violet-500 focus-within:bg-white">
+                                <div className="flex overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-brand-500 focus-within:bg-white">
                                     <span className="flex items-center pl-4 text-slate-400">
                                         @
                                     </span>
@@ -222,7 +243,7 @@ function OnboardingPageContent() {
                                     onChange={(event) => setDisplayName(event.target.value)}
                                     placeholder="Naveen Charugundla"
                                     maxLength={60}
-                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-violet-500 focus:bg-white"
+                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-brand-500 focus:bg-white"
                                     required
                                 />
 
@@ -240,17 +261,13 @@ function OnboardingPageContent() {
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="w-full rounded-2xl bg-violet-600 px-5 py-3.5 font-bold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="w-full rounded-2xl bg-brand-600 px-5 py-3.5 font-bold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {saving ? "Creating your identity..." : "CONTINUE →"}
                             </button>
                         </form>
                     </div>
 
-                    <div className="mt-6 flex justify-center gap-2">
-                        <div className="h-2 w-10 rounded-full bg-violet-600" />
-                        <div className="h-2 w-10 rounded-full bg-slate-200" />
-                    </div>
                 </div>
             </section>
         </main>
@@ -261,7 +278,7 @@ export default function OnboardingPage() {
     return (
         <Suspense
             fallback={
-                <main className="flex min-h-screen items-center justify-center bg-[#faf9ff]">
+                <main className="flex min-h-screen items-center justify-center bg-[#fff5f7]">
                     <div className="text-sm font-semibold text-slate-500">
                         Loading your FanWars identity...
                     </div>

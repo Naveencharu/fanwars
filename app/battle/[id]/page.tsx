@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import FanWarsLogo, {
     FanWarsMark,
 } from "@/components/fanwars-logo";
 
 import { supabase } from "@/lib/supabase";
+import AppHeader from "@/components/app-header";
+import BattleBoost from "@/components/battle-boost";
+import BattleCover, { SidePhoto } from "@/components/battle-cover";
+import { getDisplayOptions, type BattleOption, type BattleResult } from "@/lib/battle-results";
+import { buildBattleShareUrl, getBoostOptionId } from "@/lib/battle-share";
 
 
 /* =========================================================
@@ -25,18 +30,7 @@ type Battle = {
     image_url: string | null;
 };
 
-type BattleOption = {
-    id: number;
-    battle_id: number;
-    name: string;
-    position: number;
-};
 
-type BattleResult = {
-    option_id: number;
-    option_name: string;
-    vote_count: number;
-};
 
 
 /* =========================================================
@@ -44,9 +38,16 @@ type BattleResult = {
    ========================================================= */
 
 export default function BattlePage() {
+    return <Suspense fallback={<main className="min-h-screen bg-[#fcfbf8] p-12 text-center">Loading FanWar...</main>}>
+        <BattleContent />
+    </Suspense>;
+}
+
+function BattleContent() {
 
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const battleId = Number(params.id);
 
@@ -74,6 +75,10 @@ export default function BattlePage() {
     >("");
 
     const [shareMessage, setShareMessage] = useState("");
+    const isBoostLink = searchParams.has("boost");
+    const boostOptionId = getBoostOptionId(searchParams.getAll("boost"), options.map(option => option.id));
+    const boostSide = options.find(option => option.id === boostOptionId);
+    const mySide = options.find(option => option.id === myVote);
 
 
     /* =======================================================
@@ -82,197 +87,207 @@ export default function BattlePage() {
 
     useEffect(() => {
 
-        if (!battleId || Number.isNaN(battleId)) {
 
-            setMessage("Invalid FanWar.");
+        /* =======================================================
+           LOAD BATTLE
+           ======================================================= */
 
-            setMessageType("error");
+        async function loadBattle() {
+            // Reset state when navigating between battles without a full reload.
+            setLoading(true);
+            setBattle(null);
+            setOptions([]);
+            setResults([]);
+            setMyVote(null);
+            setCreator(null);
+            setMessage("");
+            setMessageType("");
 
-            setLoading(false);
-
-            return;
-        }
-
-        loadBattle();
-
-    }, [battleId]);
-
-
-    /* =======================================================
-       LOAD BATTLE
-       ======================================================= */
-
-    async function loadBattle() {
-
-        setLoading(true);
-
-        try {
-
-            /* -----------------------------------------------
-               Battle
-            ----------------------------------------------- */
-
-            const {
-                data: battleData,
-                error: battleError,
-            } = await supabase
-                .from("battles")
-                .select(
-                    "id, title, description, category, status, tribe_id, image_url"
-                )
-                .eq("id", battleId)
-                .single();
-
-
-            if (battleError) {
-                throw battleError;
-            }
-            if (
-                battleData.status !== "live" &&
-                battleData.status !== "closed"
-            ) {
-                setBattle(null);
-                setOptions([]);
-                setResults([]);
-                setMyVote(null);
-                setCreator(null);
-
-                setMessage(
-                    battleData.status === "pending"
-                        ? "This FanWar is currently under review."
-                        : battleData.status === "rejected"
-                            ? "This FanWar was not approved."
-                            : "This FanWar is not currently available."
-                );
-
+            if (!Number.isSafeInteger(battleId) || battleId <= 0) {
+                setMessage("Invalid FanWar.");
                 setMessageType("error");
+                setLoading(false);
                 return;
             }
 
-            /* -----------------------------------------------
-               Options
-            ----------------------------------------------- */
+            try {
 
-            const {
-                data: optionData,
-                error: optionError,
-            } = await supabase
-                .from("battle_options")
-                .select(
-                    "id, battle_id, name, position"
-                )
-                .eq("battle_id", battleId)
-                .order("position", {
-                    ascending: true,
-                });
-
-
-            if (optionError) {
-                throw optionError;
-            }
-
-
-            /* -----------------------------------------------
-               Results
-            ----------------------------------------------- */
-
-            const {
-                data: resultData,
-                error: resultError,
-            } = await supabase.rpc(
-                "get_battle_results",
-                {
-                    p_battle_id: battleId,
-                }
-            );
-
-
-            if (resultError) {
-                throw resultError;
-            }
-
-
-            /* -----------------------------------------------
-               Current user
-            ----------------------------------------------- */
-
-            const {
-                data: {
-                    user,
-                },
-            } = await supabase.auth.getUser();
-
-
-            let currentVote: number | null = null;
-
-
-            if (user) {
+                /* -----------------------------------------------
+                   Battle
+                ----------------------------------------------- */
 
                 const {
-                    data: voteData,
-                    error: voteError,
+                    data: battleData,
+                    error: battleError,
+                } = await supabase
+                    .from("battles")
+                    .select(
+                        "id, title, description, category, status, tribe_id, image_url"
+                    )
+                    .eq("id", battleId)
+                    .maybeSingle();
+
+
+                if (battleError) {
+                    throw battleError;
+                }
+                // Missing records and records hidden by RLS are both unavailable.
+                if (!battleData) {
+                    setMessage("This FanWar is unavailable or you don't have access to it.");
+                    setMessageType("error");
+                    return;
+                }
+                if (
+                    battleData.status !== "live" &&
+                    battleData.status !== "closed"
+                ) {
+                    setBattle(null);
+                    setOptions([]);
+                    setResults([]);
+                    setMyVote(null);
+                    setCreator(null);
+
+                    setMessage(
+                        battleData.status === "pending"
+                            ? "This FanWar is currently under review."
+                            : battleData.status === "rejected"
+                                ? "This FanWar was not approved."
+                                : "This FanWar is not currently available."
+                    );
+
+                    setMessageType("error");
+                    return;
+                }
+
+                /* -----------------------------------------------
+                   Options
+                ----------------------------------------------- */
+
+                const {
+                    data: optionData,
+                    error: optionError,
+                } = await supabase
+                    .from("battle_options")
+                    .select(
+                        "id, battle_id, name, position"
+                    )
+                    .eq("battle_id", battleId)
+                    .order("position", {
+                        ascending: true,
+                    });
+
+
+                if (optionError) {
+                    throw optionError;
+                }
+
+
+                /* -----------------------------------------------
+                   Results
+                ----------------------------------------------- */
+
+                const {
+                    data: resultData,
+                    error: resultError,
                 } = await supabase.rpc(
-                    "get_my_vote",
+                    "get_battle_results",
                     {
                         p_battle_id: battleId,
                     }
                 );
 
 
-                if (!voteError && voteData) {
+                if (resultError) {
+                    throw resultError;
+                }
 
-                    currentVote = Number(voteData);
+
+                /* -----------------------------------------------
+                   Current user
+                ----------------------------------------------- */
+
+                const {
+                    data: {
+                        user,
+                    },
+                } = await supabase.auth.getUser();
+
+
+                let currentVote: number | null = null;
+
+
+                if (user) {
+
+                    const {
+                        data: voteData,
+                        error: voteError,
+                    } = await supabase.rpc(
+                        "get_my_vote",
+                        {
+                            p_battle_id: battleId,
+                        }
+                    );
+
+
+                    if (!voteError && voteData) {
+
+                        currentVote = Number(voteData);
+
+                    }
 
                 }
 
+
+                setBattle(battleData);
+
+                const { data: creatorData, error: creatorError } =
+                    await supabase.rpc("get_battle_creator", {
+                        p_battle_id: battleId,
+                    });
+
+                if (!creatorError && creatorData?.[0]) {
+                    setCreator(creatorData[0]);
+                } else {
+                    setCreator(null);
+                }
+
+                setOptions(getDisplayOptions(
+                    battleId, battleData.status, optionData ?? [], resultData ?? []
+                ));
+
+                setResults(resultData ?? []);
+
+                setMyVote(currentVote);
+
+            } catch (error) {
+
+                console.error(
+                    "Battle loading error:",
+                    error
+                );
+
+                setMessage(
+                    "We couldn't load this FanWar."
+                );
+
+                setMessageType("error");
+
+            } finally {
+
+                setLoading(false);
+
             }
-
-
-            setBattle(battleData);
-
-            const { data: creatorData, error: creatorError } =
-                await supabase.rpc("get_battle_creator", {
-                    p_battle_id: battleId,
-                });
-
-            if (!creatorError && creatorData?.[0]) {
-                setCreator(creatorData[0]);
-            } else {
-                setCreator(null);
-            }
-
-            setOptions(optionData ?? []);
-
-            setResults(resultData ?? []);
-
-            setMyVote(currentVote);
-
-        } catch (error) {
-
-            console.error(
-                "Battle loading error:",
-                error
-            );
-
-            setMessage(
-                "We couldn't load this FanWar."
-            );
-
-            setMessageType("error");
-
-        } finally {
-
-            setLoading(false);
-
         }
-    }
 
+
+        void loadBattle();
+    }, [battleId]);
 
     /* =======================================================
        REFRESH RESULTS
        ======================================================= */
 
-    async function refreshResults() {
+    const refreshResults = useCallback(async () => {
 
         const {
             data,
@@ -291,7 +306,7 @@ export default function BattlePage() {
 
         }
 
-    }
+    }, [battleId]);
 
 
     /* =======================================================
@@ -318,7 +333,7 @@ export default function BattlePage() {
 
         };
 
-    }, [battleId, battle]);
+    }, [battle, refreshResults]);
 
 
     /* =======================================================
@@ -332,6 +347,15 @@ export default function BattlePage() {
         setMessage("");
 
         setMessageType("");
+
+        if (voting || !battle || battle.status !== "live") return;
+        if (!options.some(option => option.id === optionId) || (isBoostLink && optionId !== boostOptionId)) {
+            setMessage(boostSide
+                ? `This Boost invite only accepts votes for ${boostSide.name}.`
+                : "This Boost invite is invalid. Ask your friend for a new link.");
+            setMessageType("error");
+            return;
+        }
 
 
         /* -----------------------------------------------
@@ -472,11 +496,26 @@ export default function BattlePage() {
        ======================================================= */
 
     async function handleShare() {
+        await shareBattle();
+    }
+
+    async function handleBoost() {
+        if (!battle || battle.status !== "live" || !mySide) {
+            setShareMessage("Vote for your side first to create a Boost invite.");
+            return;
+        }
+        await shareBattle(mySide.id);
+    }
+
+    async function shareBattle(boostId?: number) {
         if (!battle) {
             return;
         }
 
-        let shareUrl = window.location.href;
+        const url = buildBattleShareUrl(window.location.origin, battle.id, searchParams.get("ref"), boostId);
+        let shareUrl = url.toString();
+        const side = options.find(option => option.id === boostId);
+        const copiedMessage = side ? `Boost link copied for ${side.name}.` : "Battle link copied.";
 
         try {
             const {
@@ -491,7 +530,6 @@ export default function BattlePage() {
                     .maybeSingle();
 
                 if (profile?.handler) {
-                    const url = new URL(window.location.href);
                     url.searchParams.set("ref", profile.handler);
                     shareUrl = url.toString();
                 }
@@ -500,7 +538,8 @@ export default function BattlePage() {
             if (navigator.share) {
                 await navigator.share({
                     title: `FanWars: ${battle.title}`,
-                    text: `Join me in this FanWar: ${battle.title}`,
+                    text: side ? `Back ${side.name} with me in this FanWar: ${battle.title}`
+                        : `Join me in this FanWar: ${battle.title}`,
                     url: shareUrl,
                 });
 
@@ -511,14 +550,14 @@ export default function BattlePage() {
 
             await navigator.clipboard.writeText(shareUrl);
 
-            setShareMessage("Battle link copied.");
+            setShareMessage(copiedMessage);
             setTimeout(() => setShareMessage(""), 2500);
         } catch (error) {
             console.error("Share error:", error);
 
             try {
                 await navigator.clipboard.writeText(shareUrl);
-                setShareMessage("Battle link copied.");
+                setShareMessage(copiedMessage);
                 setTimeout(() => setShareMessage(""), 2500);
             } catch {
                 setShareMessage("Unable to share this FanWar.");
@@ -535,13 +574,13 @@ export default function BattlePage() {
         return (
             <main className="min-h-screen bg-[#fcfbf8]">
 
-                <Header />
+                <AppHeader />
 
                 <div className="flex min-h-[70vh] items-center justify-center">
 
                     <div className="text-center">
 
-                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-purple-100 border-t-purple-600" />
+                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-600" />
 
                         <p className="mt-4 text-sm font-bold text-[#81798e]">
                             Loading FanWar...
@@ -565,15 +604,15 @@ export default function BattlePage() {
         return (
             <main className="min-h-screen bg-[#fcfbf8]">
 
-                <Header />
+                <AppHeader />
 
                 <div className="flex min-h-[70vh] items-center justify-center px-5">
 
-                    <div className="rounded-[2rem] border border-purple-100 bg-white p-10 text-center shadow-lg">
+                    <div className="rounded-[2rem] border border-brand-100 bg-white p-10 text-center shadow-lg">
 
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50">
 
-                            <FanWarsMark className="h-8 w-8 text-purple-600" />
+                            <FanWarsMark className="h-8 w-8 text-brand-600" />
 
                         </div>
 
@@ -656,18 +695,18 @@ export default function BattlePage() {
           HEADER
       ================================================= */}
 
-            <Header />
+            <AppHeader />
 
 
             {/* =================================================
           HERO
       ================================================= */}
 
-            <section className="relative overflow-hidden bg-gradient-to-br from-[#fff0f8] via-[#f7efff] to-[#eaf5ff]">
+            <section className="relative overflow-hidden bg-gradient-to-br from-[#fff5f7] via-[#fff5f7] to-[#eaf5ff]">
 
-                <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-purple-200/35 blur-3xl" />
+                <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-brand-200/35 blur-3xl" />
 
-                <div className="pointer-events-none absolute -right-40 top-20 h-[500px] w-[500px] rounded-full bg-pink-200/35 blur-3xl" />
+                <div className="pointer-events-none absolute -right-40 top-20 h-[500px] w-[500px] rounded-full bg-rose-200/35 blur-3xl" />
 
 
                 <div className="relative mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-16 lg:px-8">
@@ -678,7 +717,7 @@ export default function BattlePage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <Link
                             href="/home"
-                            className="inline-flex items-center gap-2 text-sm font-bold text-[#766f82] transition hover:text-purple-600"
+                            className="inline-flex items-center gap-2 text-sm font-bold text-[#766f82] transition hover:text-brand-600"
                         >
                             ← Back to Home
                         </Link>
@@ -692,20 +731,25 @@ export default function BattlePage() {
                         </button>
                     </div>
 
+                    <BattleBoost closed={isClosed} sideName={mySide?.name ?? null} onShare={handleBoost} />
+
+                    {isBoostLink && (
+                        <p role={boostSide ? "status" : "alert"} className="mt-4 rounded-2xl border border-brand-100 bg-white px-5 py-4 text-sm font-bold text-[#171525]">
+                            {boostSide
+                                ? `You've been invited to back ${boostSide.name}. This Boost invite lets you vote only for that side.`
+                                : "This Boost invite is invalid. Ask your friend for a new link."}
+                            {myVote !== null && " Your existing vote stays unchanged."}
+                        </p>
+                    )}
+
                     {shareMessage && (
-                        <div className="mt-3 text-right text-xs font-bold text-purple-600">
+                        <div className="mt-3 text-right text-xs font-bold text-brand-600">
                             {shareMessage}
                         </div>
                     )}
-                    {battle.image_url && (
-                        <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_30px_90px_rgba(55,35,100,0.14)]">
-                            <img
-                                src={battle.image_url}
-                                alt={battle.title}
-                                className="h-64 w-full object-cover sm:h-80 lg:h-[420px]"
-                            />
-                        </div>
-                    )}
+                    <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_24px_70px_rgba(23,21,37,0.14)]">
+                        <BattleCover title={battle.title} imageUrl={battle.image_url} optionNames={options.map(option => option.name)} />
+                    </div>
 
                     {/* =================================================
               BATTLE TITLE
@@ -713,9 +757,9 @@ export default function BattlePage() {
 
                     <div className="mx-auto mt-10 max-w-5xl text-center">
 
-                        <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-pink-600 shadow-sm">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-rose-600 shadow-sm">
 
-                            <span className="h-2 w-2 rounded-full bg-pink-500" />
+                            <span className="h-2 w-2 rounded-full bg-rose-500" />
 
                             {battle.status === "live"
                                 ? "LIVE"
@@ -732,7 +776,7 @@ export default function BattlePage() {
                         {battle.tribe_id && (
                             <Link
                                 href={`/tribes/${battle.tribe_id}`}
-                                className="mt-3 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-purple-600 shadow-sm ring-1 ring-black/[0.05] transition hover:-translate-y-0.5 hover:shadow-md"
+                                className="mt-3 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-brand-600 shadow-sm ring-1 ring-black/[0.05] transition hover:-translate-y-0.5 hover:shadow-md"
                             >
                                 View Tribe →
                             </Link>
@@ -752,7 +796,7 @@ export default function BattlePage() {
                         {creator && (
                             <Link
                                 href={`/u/${creator.handler}`}
-                                className="mt-4 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-xs font-extrabold text-purple-600 shadow-sm ring-1 ring-black/[0.05] transition hover:-translate-y-0.5 hover:shadow-md"
+                                className="mt-4 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-xs font-extrabold text-brand-600 shadow-sm ring-1 ring-black/[0.05] transition hover:-translate-y-0.5 hover:shadow-md"
                             >
                                 Created by @{creator.handler}
                             </Link>
@@ -800,6 +844,7 @@ export default function BattlePage() {
                                 myVote={myVote}
                                 voting={voting}
                                 closed={isClosed}
+                                voteRestricted={isBoostLink && options[0]?.id !== boostOptionId}
                                 onVote={handleVote}
                             />
 
@@ -808,7 +853,7 @@ export default function BattlePage() {
 
                             <div className="flex items-center justify-center">
 
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-500 text-xs font-black text-white shadow-lg shadow-purple-200">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-rose-500 text-xs font-black text-white shadow-lg shadow-brand-200">
                                     VS
                                 </div>
 
@@ -824,6 +869,7 @@ export default function BattlePage() {
                                 myVote={myVote}
                                 voting={voting}
                                 closed={isClosed}
+                                voteRestricted={isBoostLink && options[1]?.id !== boostOptionId}
                                 onVote={handleVote}
                             />
 
@@ -834,7 +880,7 @@ export default function BattlePage() {
                 VOTING MESSAGE
             ================================================= */}
 
-                        <div className="mt-8 border-t border-purple-100 pt-7 text-center">
+                        <div className="mt-8 border-t border-brand-100 pt-7 text-center">
 
 
                             {message && (
@@ -849,9 +895,9 @@ export default function BattlePage() {
                             )}
 
 
-                            <div className="inline-flex items-center gap-2 rounded-full bg-[#f8f6fb] px-5 py-2.5 text-xs font-bold text-[#81798e]">
+                            <div className="inline-flex items-center gap-2 rounded-full bg-[#fff5f7] px-5 py-2.5 text-xs font-bold text-[#81798e]">
 
-                                <FanWarsMark className="h-4 w-4 text-purple-600" />
+                                <FanWarsMark className="h-4 w-4 text-brand-600" />
 
                                 1 person = 1 verified vote
 
@@ -897,7 +943,7 @@ export default function BattlePage() {
           FOOTER
       ================================================= */}
 
-            <footer className="border-t border-purple-100/70 bg-white">
+            <footer className="border-t border-brand-100/70 bg-white">
 
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
 
@@ -920,87 +966,6 @@ export default function BattlePage() {
    HEADER
    ========================================================= */
 
-function Header() {
-    const [displayName, setDisplayName] = useState("");
-    const [handler, setHandler] = useState("");
-
-    useEffect(() => {
-        async function loadCurrentUser() {
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
-
-            if (!user) {
-                return;
-            }
-
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("display_name, handler")
-                .eq("id", user.id)
-                .maybeSingle();
-
-            if (profile) {
-                setDisplayName(profile.display_name);
-                setHandler(profile.handler);
-            }
-        }
-
-        loadCurrentUser();
-    }, []);
-
-    return (
-        <header className="sticky top-0 z-50 border-b border-purple-100/60 bg-white/90 backdrop-blur-xl">
-            <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
-
-                <FanWarsLogo />
-
-                <nav className="hidden items-center gap-8 text-sm font-bold text-[#676174] md:flex">
-                    <Link
-                        href="/home"
-                        className="transition hover:text-purple-600"
-                    >
-                        Home
-                    </Link>
-
-                    <Link
-                        href="/tribes"
-                        className="transition hover:text-purple-600"
-                    >
-                        Tribes
-                    </Link>
-                </nav>
-
-                <Link
-                    href="/profile"
-                    className="flex items-center gap-3 rounded-full border border-purple-100 bg-white px-4 py-2 shadow-sm"
-                >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-xs font-black text-purple-700">
-                        {displayName
-                            ? displayName.charAt(0).toUpperCase()
-                            : "F"}
-                    </div>
-
-                    <div className="hidden text-left leading-tight sm:block">
-                        <p className="max-w-[120px] truncate text-xs font-extrabold text-[#171525]">
-                            {displayName || "Fan"}
-                        </p>
-
-                        <p className="max-w-[120px] truncate text-[10px] font-semibold text-[#8a8395]">
-                            {handler ? `@${handler}` : ""}
-                        </p>
-                    </div>
-                </Link>
-            </div>
-        </header>
-    );
-}
-
-
-/* =========================================================
-   BATTLE SIDE
-   ========================================================= */
-
 function BattleSide({
     option,
     result,
@@ -1008,6 +973,7 @@ function BattleSide({
     myVote,
     voting,
     closed,
+    voteRestricted,
     onVote,
 }: {
     option: BattleOption;
@@ -1016,6 +982,7 @@ function BattleSide({
     myVote: number | null;
     voting: boolean;
     closed: boolean;
+    voteRestricted: boolean;
     onVote: (
         optionId: number
     ) => void;
@@ -1046,8 +1013,8 @@ function BattleSide({
     return (
         <div
             className={`rounded-3xl border p-6 transition-all ${selected
-                ? "border-purple-300 bg-purple-50/70 shadow-md"
-                : "border-purple-100/70 bg-[#fcfbff]"
+                ? "border-brand-300 bg-brand-50/70 shadow-md"
+                : "border-brand-100/70 bg-[#fff5f7]"
                 }`}
         >
 
@@ -1056,11 +1023,7 @@ function BattleSide({
           LOGO
       ================================================= */}
 
-            <div className="flex h-28 items-center justify-center">
-
-                {getTribeLogo(option.name)}
-
-            </div>
+            <div className="h-40 overflow-hidden rounded-2xl sm:h-48"><SidePhoto name={option.name} showLabel={false} /></div>
 
 
             {/* =================================================
@@ -1087,10 +1050,12 @@ function BattleSide({
                 <button
                     type="button"
                     onClick={() => onVote(option.id)}
-                    disabled={voting}
+                    disabled={voting || voteRestricted}
                     className="mt-7 w-full rounded-full bg-[#171525] px-5 py-4 text-sm font-extrabold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {voting
+                    {voteRestricted
+                        ? "Unavailable through this Boost invite"
+                        : voting
                         ? "Recording..."
                         : `Choose ${option.name}`}
                 </button>
@@ -1099,8 +1064,8 @@ function BattleSide({
 
                 <div
                     className={`mt-7 w-full rounded-full px-5 py-4 text-center text-sm font-extrabold ${selected
-                            ? "bg-purple-600 text-white"
-                            : "bg-purple-50 text-purple-700"
+                            ? "bg-brand-600 text-white"
+                            : "bg-brand-50 text-brand-700"
                         }`}
                 >
                     {selected
@@ -1127,18 +1092,18 @@ function BattleSide({
                     </span>
 
                     {(myVote !== null || closed) && (
-                        <span className="text-sm font-black text-purple-700">
+                        <span className="text-sm font-black text-brand-700">
                             {percentage}%
                         </span>
                     )}
 
                 </div>
 
-                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-purple-100">
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-brand-100">
 
                     {(myVote !== null || closed) && (
                         <div
-                            className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-700"
+                            className="h-full rounded-full bg-gradient-to-r from-brand-500 to-rose-500 transition-all duration-700"
                             style={{
                                 width: `${percentage}%`,
                             }}
@@ -1155,285 +1120,3 @@ function BattleSide({
 /* =========================================================
    TRIBE LOGO ROUTER
    ========================================================= */
-
-function getTribeLogo(
-    name: string
-) {
-
-    switch (name) {
-
-        case "Chai Gang":
-            return <ChaiGangLogo />;
-
-        case "Coffee Crew":
-            return <CoffeeCrewLogo />;
-
-        case "Cricket Nation":
-            return <CricketLogo />;
-
-        case "Football Tribe":
-            return <FootballLogo />;
-
-        case "Biryani Believers":
-            return <BiryaniLogo />;
-
-        case "Pizza People":
-            return <PizzaLogo />;
-
-        case "Marvel Universe":
-            return <MarvelLogo />;
-
-        case "DC Universe":
-            return <DCLogo />;
-
-        case "Beach Tribe":
-            return <BeachLogo />;
-
-        default:
-            return <DefaultTribeLogo />;
-    }
-}
-
-
-/* =========================================================
-   CHAI GANG LOGO
-   ========================================================= */
-
-function ChaiGangLogo() {
-
-    return (
-        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-[#fff4e8] shadow-sm">
-
-            <svg
-                viewBox="0 0 80 80"
-                className="h-20 w-20"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-
-                <ellipse
-                    cx="40"
-                    cy="61"
-                    rx="22"
-                    ry="5"
-                    fill="#D7B99A"
-                />
-
-                <path
-                    d="M23 35H57V51C57 57.627 51.627 63 45 63H35C28.373 63 23 57.627 23 51V35Z"
-                    fill="#FFFDF9"
-                    stroke="#2C2533"
-                    strokeWidth="2.5"
-                />
-
-                <ellipse
-                    cx="40"
-                    cy="35"
-                    rx="17"
-                    ry="6"
-                    fill="#F6EEE6"
-                    stroke="#2C2533"
-                    strokeWidth="2.5"
-                />
-
-                <ellipse
-                    cx="40"
-                    cy="35"
-                    rx="12"
-                    ry="4"
-                    fill="#9B5B32"
-                />
-
-                <path
-                    d="M57 39C67 37 69 42 66 48C64 52 60 52 56 51"
-                    stroke="#2C2533"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-                <path
-                    d="M33 26C29 21 36 19 33 14"
-                    stroke="#C08A65"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-                <path
-                    d="M42 26C38 21 45 19 42 14"
-                    stroke="#C08A65"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-                <path
-                    d="M51 26C47 21 54 19 51 14"
-                    stroke="#C08A65"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-            </svg>
-
-        </div>
-    );
-}
-
-
-/* =========================================================
-   COFFEE CREW LOGO
-   ========================================================= */
-
-function CoffeeCrewLogo() {
-
-    return (
-        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-[#f4eee8] shadow-sm">
-
-            <svg
-                viewBox="0 0 80 80"
-                className="h-20 w-20"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-
-                <ellipse
-                    cx="40"
-                    cy="61"
-                    rx="23"
-                    ry="5"
-                    fill="#C8B5A3"
-                />
-
-                <path
-                    d="M22 35H58V51C58 57.627 52.627 63 46 63H34C27.373 63 22 57.627 22 51V35Z"
-                    fill="#FFFDF9"
-                    stroke="#2C2533"
-                    strokeWidth="2.5"
-                />
-
-                <ellipse
-                    cx="40"
-                    cy="35"
-                    rx="18"
-                    ry="7"
-                    fill="#F1E5DA"
-                    stroke="#2C2533"
-                    strokeWidth="2.5"
-                />
-
-                <ellipse
-                    cx="40"
-                    cy="35"
-                    rx="13"
-                    ry="4.5"
-                    fill="#68432F"
-                />
-
-                <path
-                    d="M58 39C68 37 70 42 67 48C65 52 61 52 57 51"
-                    stroke="#2C2533"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-                <path
-                    d="M32 26C28 21 35 19 32 14"
-                    stroke="#9D8575"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-                <path
-                    d="M41 26C37 21 44 19 41 14"
-                    stroke="#9D8575"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-                <path
-                    d="M50 26C46 21 53 19 50 14"
-                    stroke="#9D8575"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-
-            </svg>
-
-        </div>
-    );
-}
-
-
-/* =========================================================
-   OTHER TRIBE LOGOS
-   ========================================================= */
-
-function CricketLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#edf7ee] text-4xl shadow-sm">
-            🏏
-        </div>
-    );
-}
-
-
-function FootballLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#eef4ff] text-4xl shadow-sm">
-            ⚽
-        </div>
-    );
-}
-
-
-function BiryaniLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#fff4df] text-4xl shadow-sm">
-            🍛
-        </div>
-    );
-}
-
-
-function PizzaLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#fff0ec] text-4xl shadow-sm">
-            🍕
-        </div>
-    );
-}
-
-
-function MarvelLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#f4efff] text-4xl shadow-sm">
-            🦸
-        </div>
-    );
-}
-
-
-function DCLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#edf4ff] text-4xl shadow-sm">
-            🦇
-        </div>
-    );
-}
-
-
-function BeachLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#eef9ff] text-4xl shadow-sm">
-            🏖️
-        </div>
-    );
-}
-
-
-function DefaultTribeLogo() {
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-purple-50 text-4xl shadow-sm">
-            ⚔️
-        </div>
-    );
-}

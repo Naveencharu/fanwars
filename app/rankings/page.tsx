@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import FanWarsLogo from "@/components/fanwars-logo";
 import AppHeader from "@/components/app-header";
+import { SidePhoto } from "@/components/battle-cover";
 import { supabase } from "@/lib/supabase";
 
 type Battle = {
@@ -11,13 +12,6 @@ type Battle = {
     title: string;
     category: string;
     status: string;
-};
-
-type BattleOption = {
-    id: number;
-    battle_id: number;
-    name: string;
-    position: number;
 };
 
 type Result = {
@@ -33,18 +27,6 @@ type RankedOption = {
     battleTitle: string;
     category: string;
 };
-
-function getOptionEmoji(name: string) {
-    if (name.toLowerCase().includes("chai")) return "☕";
-    if (name.toLowerCase().includes("coffee")) return "☕";
-    if (name.toLowerCase().includes("cricket")) return "🏏";
-    if (name.toLowerCase().includes("football")) return "⚽";
-    if (name.toLowerCase().includes("biryani")) return "🍛";
-    if (name.toLowerCase().includes("pizza")) return "🍕";
-    if (name.toLowerCase().includes("marvel")) return "🦸";
-    if (name.toLowerCase().includes("dc")) return "⚡";
-    return "🔥";
-}
 
 function getOptionStyle(name: string) {
     const value = name.toLowerCase();
@@ -74,14 +56,14 @@ function getOptionStyle(name: string) {
     }
 
     if (value.includes("marvel")) {
-        return "from-red-50 to-pink-50 border-red-100";
+        return "from-red-50 to-rose-50 border-red-100";
     }
 
     if (value.includes("dc")) {
         return "from-blue-50 to-indigo-50 border-blue-100";
     }
 
-    return "from-purple-50 to-pink-50 border-purple-100";
+    return "from-brand-50 to-rose-50 border-brand-100";
 }
 
 export default function RankingsPage() {
@@ -91,66 +73,66 @@ export default function RankingsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    async function loadRankings() {
-        try {
-            setError("");
+    useEffect(() => {
+        async function loadRankings() {
+            try {
+                setError("");
 
-            const { data: battleData, error: battleError } = await supabase
-                .from("battles")
-                .select("id, title, category, status")
-                .eq("status", "live")
-                .order("id", { ascending: true });
+                const { data: battleData, error: battleError } = await supabase
+                    .from("battles")
+                    .select("id, title, category, status")
+                    .eq("status", "live")
+                    .order("id", { ascending: true });
 
-            if (battleError) {
-                throw battleError;
-            }
-
-            const liveBattles = (battleData || []) as Battle[];
-
-            setBattles(liveBattles);
-
-            const rankingRows: RankedOption[] = [];
-
-            for (const battle of liveBattles) {
-                const { data: resultData, error: resultError } =
-                    await supabase.rpc("get_battle_results", {
-                        p_battle_id: battle.id,
-                    });
-
-                if (resultError) {
-                    throw resultError;
+                if (battleError) {
+                    throw battleError;
                 }
 
-                const results = (resultData || []) as Result[];
+                const liveBattles = (battleData || []) as Battle[];
 
-                results.forEach((result) => {
-                    rankingRows.push({
-                        option_id: result.option_id,
-                        name: result.option_name,
-                        votes: Number(result.vote_count),
-                        battleTitle: battle.title,
-                        category: battle.category,
+                setBattles(liveBattles);
+
+                const rankingRows: RankedOption[] = [];
+
+                for (const battle of liveBattles) {
+                    const { data: resultData, error: resultError } =
+                        await supabase.rpc("get_battle_results", {
+                            p_battle_id: battle.id,
+                        });
+
+                    if (resultError) {
+                        throw resultError;
+                    }
+
+                    const results = (resultData || []) as Result[];
+
+                    results.forEach((result) => {
+                        rankingRows.push({
+                            option_id: result.option_id,
+                            name: result.option_name,
+                            votes: Number(result.vote_count),
+                            battleTitle: battle.title,
+                            category: battle.category,
+                        });
                     });
-                });
+                }
+
+                rankingRows.sort((a, b) => b.votes - a.votes);
+
+                setRankings(rankingRows);
+
+                setTotalVotes(
+                    rankingRows.reduce((sum, item) => sum + item.votes, 0)
+                );
+            } catch (err) {
+                console.error("Failed to load rankings:", err);
+                setError("We couldn't load the rankings right now.");
+            } finally {
+                setLoading(false);
             }
-
-            rankingRows.sort((a, b) => b.votes - a.votes);
-
-            setRankings(rankingRows);
-
-            setTotalVotes(
-                rankingRows.reduce((sum, item) => sum + item.votes, 0)
-            );
-        } catch (err) {
-            console.error("Failed to load rankings:", err);
-            setError("We couldn't load the rankings right now.");
-        } finally {
-            setLoading(false);
         }
-    }
 
-    useEffect(() => {
-        loadRankings();
+        void loadRankings();
 
         const interval = setInterval(loadRankings, 5000);
 
@@ -166,14 +148,14 @@ export default function RankingsPage() {
             <section className="border-b border-black/[0.05] bg-white">
                 <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16">
                     <div className="max-w-3xl">
-                        <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-purple-700">
-                            <span className="h-2 w-2 animate-pulse rounded-full bg-purple-500" />
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-brand-700">
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
                             Live Rankings
                         </div>
 
                         <h1 className="text-4xl font-black tracking-[-0.045em] sm:text-6xl">
                             Who has the{" "}
-                            <span className="bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent">
+                            <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-rose-500 bg-clip-text text-transparent">
                                 Fan Power?
                             </span>
                         </h1>
@@ -308,8 +290,8 @@ export default function RankingsPage() {
                                         </div>
 
                                         {/* Tribe icon */}
-                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
-                                            {getOptionEmoji(item.name)}
+                                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-sm">
+                                            <SidePhoto name={item.name} showLabel={false} sizes="56px" />
                                         </div>
 
                                         {/* Main */}
@@ -379,7 +361,7 @@ export default function RankingsPage() {
                                     className="group rounded-[2rem] border border-black/[0.06] bg-[#fcfbf8] p-6 transition hover:-translate-y-1 hover:shadow-lg"
                                 >
                                     <div className="flex items-center justify-between gap-4">
-                                        <span className="rounded-full bg-purple-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-purple-700">
+                                        <span className="rounded-full bg-brand-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-brand-700">
                                             {battle.category}
                                         </span>
 

@@ -319,7 +319,7 @@ export default function AdminFanWarsPage() {
     if (loading) {
         return (
             <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-                <AppHeader showBackToHome />
+                <AppHeader />
 
                 <div className="mx-auto max-w-5xl px-5 py-16 text-center">
                     <p className="text-sm font-semibold text-[#686577]">
@@ -333,7 +333,7 @@ export default function AdminFanWarsPage() {
     if (!authorized) {
         return (
             <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-                <AppHeader showBackToHome />
+                <AppHeader />
 
                 <section className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center px-5 py-12">
                     <div className="w-full rounded-[2rem] border border-black/[0.06] bg-white p-8 text-center shadow-sm sm:p-12">
@@ -364,12 +364,12 @@ export default function AdminFanWarsPage() {
 
     return (
         <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-            <AppHeader showBackToHome />
+            <AppHeader />
 
             <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <p className="text-xs font-black uppercase tracking-[0.16em] text-purple-600">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-brand-600">
                             FanWars Moderation
                         </p>
 
@@ -421,7 +421,7 @@ export default function AdminFanWarsPage() {
                                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap gap-2">
-                                            <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-extrabold text-purple-700">
+                                            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-extrabold text-brand-700">
                                                 {fanWar.category}
                                             </span>
 
@@ -634,7 +634,7 @@ export default function AdminFanWarsPage() {
 
                                     <Link
                                         href={`/battle/${fanWar.id}`}
-                                        className="mt-3 inline-flex text-sm font-extrabold text-purple-600"
+                                        className="mt-3 inline-flex text-sm font-extrabold text-brand-600"
                                     >
                                         View FanWar →
                                     </Link>

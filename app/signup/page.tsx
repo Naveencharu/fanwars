@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
+import FanWarsLogo from "@/components/fanwars-logo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -67,11 +68,9 @@ function SignupPageContent() {
     }
 
     return (
-        <main className="min-h-screen bg-[#faf9ff] text-slate-950">
+        <main className="min-h-screen bg-[#fff5f7] text-slate-950">
             <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-                <Link href="/" className="text-2xl font-black tracking-tight">
-                    FAN<span className="text-violet-600">WARS</span>
-                </Link>
+                <FanWarsLogo href="/" size="md" />
 
                 <Link
                     href={
@@ -89,7 +88,7 @@ function SignupPageContent() {
             <section className="flex min-h-[calc(100vh-100px)] items-center justify-center px-6 py-12">
                 <div className="w-full max-w-md">
                     <div className="mb-8 text-center">
-                        <div className="mb-4 inline-flex rounded-full bg-violet-100 px-4 py-2 text-sm font-bold text-violet-700">
+                        <div className="mb-4 inline-flex rounded-full bg-brand-100 px-4 py-2 text-sm font-bold text-brand-700">
                             🔥 Join the movement
                         </div>
 
@@ -118,7 +117,7 @@ function SignupPageContent() {
                                     value={email}
                                     onChange={(event) => setEmail(event.target.value)}
                                     placeholder="you@example.com"
-                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-violet-500 focus:bg-white"
+                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-brand-500 focus:bg-white"
                                     required
                                 />
                             </div>
@@ -137,7 +136,7 @@ function SignupPageContent() {
                                     value={password}
                                     onChange={(event) => setPassword(event.target.value)}
                                     placeholder="At least 6 characters"
-                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-violet-500 focus:bg-white"
+                                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-brand-500 focus:bg-white"
                                     required
                                 />
                             </div>
@@ -157,7 +156,7 @@ function SignupPageContent() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full rounded-2xl bg-violet-600 px-5 py-3.5 font-bold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="w-full rounded-2xl bg-brand-600 px-5 py-3.5 font-bold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {loading ? "Creating account..." : "CREATE ACCOUNT →"}
                             </button>
@@ -172,7 +171,7 @@ function SignupPageContent() {
                                         }`
                                         : "/login"
                                 }
-                                className="font-bold text-violet-600 hover:text-violet-500"
+                                className="font-bold text-brand-600 hover:text-brand-500"
                             >
                                 Log in
                             </Link>
@@ -192,7 +191,7 @@ export default function SignupPagecontent() {
     return (
         <Suspense
             fallback={
-                <main className="flex min-h-screen items-center justify-center bg-[#faf9ff]">
+                <main className="flex min-h-screen items-center justify-center bg-[#fff5f7]">
                     <div className="text-sm font-semibold text-slate-500">
                         Loading FanWars...
                     </div>

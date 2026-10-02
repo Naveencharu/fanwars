@@ -5,7 +5,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import AppHeader from "@/components/app-header";
+import BattleCover, { SidePhoto } from "@/components/battle-cover";
 import { supabase } from "@/lib/supabase";
+import { loadVoteCounts } from "@/lib/battle-results";
 
 type Clan = {
     id: number;
@@ -167,30 +169,10 @@ export default function ClanDetailPage() {
                         .in("battle_id", battleIds);
 
                     if (allOptionsError) throw allOptionsError;
-                    const optionIds = (allBattleOptions ?? []).map(
-                        (option) => option.id
+                    const voteCountMap = await loadVoteCounts(
+                        supabase, (battleRows ?? []).map((battle) => battle.id)
                     );
 
-                    const voteCountMap = new Map<number, number>();
-
-                    if (optionIds.length > 0) {
-                        const {
-                            data: voteRows,
-                            error: votesError,
-                        } = await supabase
-                            .from("votes")
-                            .select("option_id")
-                            .in("option_id", optionIds);
-
-                        if (votesError) throw votesError;
-
-                        for (const vote of voteRows ?? []) {
-                            voteCountMap.set(
-                                vote.option_id,
-                                (voteCountMap.get(vote.option_id) ?? 0) + 1
-                            );
-                        }
-                    }
                     const opponentClanIds = [
                         ...new Set(
                             (allBattleOptions ?? [])
@@ -440,7 +422,10 @@ export default function ClanDetailPage() {
                 }
             );
 
-            if (joinError) throw joinError;
+            if (joinError) {
+                setError(joinError.message || "Unable to join this Clan.");
+                return;
+            }
 
             window.location.reload();
         } catch (err) {
@@ -504,6 +489,23 @@ export default function ClanDetailPage() {
     const captain = members.find(
         (member) => member.role === "captain"
     );
+    const closedFanWars = fanWars.filter(
+        (fanWar) => fanWar.status === "closed"
+    );
+
+    const played = closedFanWars.length;
+
+    const wins = closedFanWars.filter(
+        (fanWar) => fanWar.clan_votes > fanWar.opponent_votes
+    ).length;
+
+    const losses = closedFanWars.filter(
+        (fanWar) => fanWar.clan_votes < fanWar.opponent_votes
+    ).length;
+
+    const draws = closedFanWars.filter(
+        (fanWar) => fanWar.clan_votes === fanWar.opponent_votes
+    ).length;
 
     return (
         <main className="min-h-screen bg-[#fcfbf8]">
@@ -521,34 +523,27 @@ export default function ClanDetailPage() {
 
                 {/* Clan Hero */}
                 <section className="mt-5 overflow-hidden rounded-[2rem] border border-black/[0.06] bg-white shadow-sm">
-                    <div className="bg-gradient-to-br from-purple-100 via-white to-pink-100 px-6 py-10 sm:px-10 sm:py-12">
-                        <div className="flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative isolate overflow-hidden px-6 py-10 sm:px-10 sm:py-12">
+                        <div className="absolute inset-0 -z-10">
+                            <SidePhoto name={clan.name} description={clan.description} parentTopic={tribe?.name} image={clan.image_url} showLabel={false} sizes="(max-width: 1024px) 100vw, 1024px" />
+                            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/15" />
+                        </div>
+                        <div className="flex min-h-48 flex-col justify-end gap-7 sm:flex-row sm:items-end sm:justify-between">
                             <div className="flex items-center gap-5">
-                                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-white text-4xl shadow-sm">
-                                    {clan.image_url ? (
-                                        <img
-                                            src={clan.image_url}
-                                            alt={clan.name}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    ) : (
-                                        "🛡️"
-                                    )}
-                                </div>
 
                                 <div>
-                                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-purple-600">
+                                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/80">
                                         {tribe
                                             ? `${tribe.name} Clan`
                                             : "FanWars Clan"}
                                     </p>
 
-                                    <h1 className="mt-1 text-3xl font-black tracking-tight text-[#171525] sm:text-4xl">
+                                    <h1 className="mt-2 text-3xl font-black tracking-tight text-white drop-shadow-lg sm:text-4xl">
                                         {clan.name}
                                     </h1>
 
                                     {clan.description && (
-                                        <p className="mt-3 max-w-xl text-sm leading-6 text-[#686577]">
+                                        <p className="mt-3 max-w-xl text-sm leading-6 text-white/90">
                                             {clan.description}
                                         </p>
                                     )}
@@ -560,7 +555,7 @@ export default function ClanDetailPage() {
                                     👑 Captain
                                 </div>
                             ) : isMember ? (
-                                <div className="rounded-full bg-purple-100 px-5 py-3 text-sm font-extrabold text-purple-700">
+                                <div className="rounded-full bg-brand-100 px-5 py-3 text-sm font-extrabold text-brand-700">
                                     ✓ Joined
                                 </div>
                             ) : (
@@ -579,42 +574,71 @@ export default function ClanDetailPage() {
                     </div>
 
                     {/* Clan Stats */}
-                    <div className="grid grid-cols-2 border-t border-black/[0.06] sm:grid-cols-3">
-                        <div className="px-5 py-5 text-center">
+                    {/* Clan Stats */}
+                    <div className="grid grid-cols-2 border-t border-black/[0.06] sm:grid-cols-5">
+
+                        <div className="px-4 py-5 text-center">
                             <p className="text-2xl font-black text-[#171525]">
                                 {members.length}
                             </p>
-
                             <p className="mt-1 text-xs font-bold text-[#888393]">
                                 Members
                             </p>
                         </div>
 
-                        <div className="border-l border-black/[0.06] px-5 py-5 text-center">
-                            <p className="text-2xl font-black text-purple-600">
-                                {captain ? "1" : "—"}
-                            </p>
-
-                            <p className="mt-1 text-xs font-bold text-[#888393]">
-                                Captain
-                            </p>
-                        </div>
-
-                        <div className="col-span-2 border-t border-black/[0.06] px-5 py-5 text-center sm:col-span-1 sm:border-l sm:border-t-0">
+                        <div className="border-l border-black/[0.06] px-4 py-5 text-center">
                             <p className="text-2xl font-black text-[#171525]">
-                                {fanWars.length}
+                                {played}
                             </p>
-
                             <p className="mt-1 text-xs font-bold text-[#888393]">
-                                Clan FanWars
+                                Played
                             </p>
                         </div>
+
+                        <div className="border-t border-black/[0.06] px-4 py-5 text-center sm:border-l sm:border-t-0">
+                            <p className="text-2xl font-black text-green-600">
+                                {wins}
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-[#888393]">
+                                Won
+                            </p>
+                        </div>
+
+                        <div className="border-l border-t border-black/[0.06] px-4 py-5 text-center sm:border-t-0">
+                            <p className="text-2xl font-black text-red-600">
+                                {losses}
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-[#888393]">
+                                Lost
+                            </p>
+                        </div>
+
+                        <div className="col-span-2 border-t border-black/[0.06] px-4 py-5 text-center sm:col-span-1 sm:border-l sm:border-t-0">
+                            <p className="text-2xl font-black text-amber-600">
+                                {draws}
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-[#888393]">
+                                Draw
+                            </p>
+                        </div>
+
                     </div>
                 </section>
 
+                {error && (
+                    <div role="alert" className="mt-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                        {error}
+                        {error === "Join the Tribe before joining this Clan" && (
+                            <Link href={`/tribes/${clan.tribe_id}`} className="ml-2 underline">
+                                Join {tribe?.name ?? "the Tribe"}
+                            </Link>
+                        )}
+                    </div>
+                )}
+
                 {/* Captain */}
                 <section className="mt-8">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                         Leadership
                     </p>
 
@@ -672,7 +696,7 @@ export default function ClanDetailPage() {
                 <section className="mt-8">
                     <div className="flex items-end justify-between gap-4">
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                                 Community
                             </p>
 
@@ -700,7 +724,7 @@ export default function ClanDetailPage() {
                                     href={`/u/${member.handler}`}
                                     className="flex items-center gap-3 rounded-2xl border border-black/[0.06] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
                                 >
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-purple-100 text-sm font-black text-purple-700">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-sm font-black text-brand-700">
                                         {member.avatar_url ? (
                                             <img
                                                 src={
@@ -753,7 +777,7 @@ export default function ClanDetailPage() {
 
                 {/* Clan FanWars */}
                 <section className="mt-8">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                         Competition
                     </p>
 
@@ -781,13 +805,7 @@ export default function ClanDetailPage() {
                                     href={`/battle/${fanWar.id}`}
                                     className="overflow-hidden rounded-3xl border border-black/[0.06] bg-white transition hover:-translate-y-0.5 hover:shadow-md"
                                 >
-                                    {fanWar.image_url && (
-                                        <img
-                                            src={fanWar.image_url}
-                                            alt={fanWar.title}
-                                            className="aspect-[3/1] w-full object-cover"
-                                        />
-                                    )}
+                                    <BattleCover title={fanWar.title} imageUrl={fanWar.image_url} optionNames={fanWar.opponent_clan_name ? [fanWar.option_text, fanWar.opponent_clan_name] : []} parentTopic={tribe?.name} compact />
 
                                     <div className="p-5 sm:p-6">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -799,7 +817,13 @@ export default function ClanDetailPage() {
                                                         : "bg-black/5 text-[#686577]"
                                                     }`}
                                             >
-                                                {fanWar.status}
+                                                {fanWar.status === "closed"
+                                                    ? fanWar.clan_votes > fanWar.opponent_votes
+                                                        ? "WON"
+                                                        : fanWar.clan_votes < fanWar.opponent_votes
+                                                            ? "LOST"
+                                                            : "DRAW"
+                                                    : fanWar.status}
                                             </span>
 
                                             <span className="text-xs font-bold text-[#888393]">
@@ -818,12 +842,12 @@ export default function ClanDetailPage() {
                                         )}
 
                                         <div className="mt-5 flex items-center gap-3">
-                                            <div className="flex-1 rounded-2xl bg-purple-50 px-4 py-3 text-center">
+                                            <div className="flex-1 rounded-2xl bg-brand-50 px-4 py-3 text-center">
                                                 <p className="text-xs font-bold text-[#888393]">
                                                     This Clan
                                                 </p>
 
-                                                <p className="mt-1 font-black text-purple-700">
+                                                <p className="mt-1 font-black text-brand-700">
                                                     {fanWar.option_text}
                                                 </p>
                                                 <p className="mt-2 text-xs font-bold text-[#686577]">
@@ -831,7 +855,7 @@ export default function ClanDetailPage() {
                                                     {fanWar.clan_votes === 1 ? "vote" : "votes"}
                                                 </p>
 
-                                                <p className="mt-1 text-lg font-black text-purple-700">
+                                                <p className="mt-1 text-lg font-black text-brand-700">
                                                     {fanWar.total_votes > 0
                                                         ? Math.round(
                                                             (fanWar.clan_votes / fanWar.total_votes) * 100
@@ -878,7 +902,7 @@ export default function ClanDetailPage() {
                                                 {fanWar.total_votes === 1 ? "vote" : "votes"}
                                             </span>
 
-                                            <span className="text-sm font-extrabold text-purple-600">
+                                            <span className="text-sm font-extrabold text-brand-600">
                                                 View FanWar →
                                             </span>
                                         </div>
@@ -889,11 +913,6 @@ export default function ClanDetailPage() {
                     )}
                 </section>
 
-                {error && (
-                    <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                        {error}
-                    </div>
-                )}
             </div>
         </main>
     );

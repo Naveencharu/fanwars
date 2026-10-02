@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import AppHeader from "@/components/app-header";
-import FanWarsLogo from "@/components/fanwars-logo";
+import BattleCover, { SidePhoto } from "@/components/battle-cover";
 import ImageUpload from "@/components/image-upload";
 import { supabase } from "@/lib/supabase";
 
@@ -24,6 +24,7 @@ type Tribe = {
     id: number;
     name: string;
     description: string | null;
+    image_url: string | null;
 };
 
 type BattleHistory = {
@@ -42,6 +43,7 @@ type CreatedFanWar = {
     rejection_reason: string | null;
     created_at: string;
     tribe_id: number | null;
+    image_url?: string | null;
 };
 export default function ProfilePage() {
     const router = useRouter();
@@ -55,99 +57,103 @@ export default function ProfilePage() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        loadProfile();
-    }, []);
 
-    async function loadProfile() {
-        setLoading(true);
-        setError("");
+        async function loadProfile() {
 
-        const {
-            data: { user },
-            error: userError,
-        } = await supabase.auth.getUser();
+            const {
+                data: { user },
+                error: userError,
+            } = await supabase.auth.getUser();
 
-        if (userError || !user) {
-            router.replace("/login");
-            return;
-        }
-
-        const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select(
-                "id, username, handler, display_name, avatar_url, banner_url, bio, created_at"
-            )
-            .eq("id", user.id)
-            .maybeSingle();
-
-        if (profileError) {
-            console.error("Profile load failed:", profileError);
-            setError("We couldn't load your profile.");
-            setLoading(false);
-            return;
-        }
-
-        if (!profileData) {
-            router.replace("/onboarding");
-            return;
-        }
-
-        setProfile(profileData);
-
-        const { data: membershipData, error: membershipError } = await supabase
-            .from("tribe_members")
-            .select("tribe_id")
-            .eq("user_id", user.id);
-
-        if (membershipError) {
-            console.error("Tribe membership load failed:", membershipError);
-        }
-
-        const tribeIds = (membershipData ?? []).map(
-            (membership) => membership.tribe_id
-        );
-
-        if (tribeIds.length > 0) {
-            const { data: tribeData, error: tribeError } = await supabase
-                .from("tribes")
-                .select("id, name, description")
-                .in("id", tribeIds)
-                .order("name");
-
-            if (tribeError) {
-                console.error("Tribe load failed:", tribeError);
-            } else {
-                setTribes(tribeData ?? []);
+            if (userError || !user) {
+                router.replace("/login");
+                return;
             }
-        } else {
-            setTribes([]);
+
+            const { data: profileData, error: profileError } = await supabase
+                .from("profiles")
+                .select(
+                    "id, username, handler, display_name, avatar_url, banner_url, bio, created_at"
+                )
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (profileError) {
+                console.error("Profile load failed:", profileError);
+                setError("We couldn't load your profile.");
+                setLoading(false);
+                return;
+            }
+
+            if (!profileData) {
+                router.replace("/onboarding");
+                return;
+            }
+
+            setProfile(profileData);
+
+            const { data: membershipData, error: membershipError } = await supabase
+                .from("tribe_members")
+                .select("tribe_id")
+                .eq("user_id", user.id);
+
+            if (membershipError) {
+                console.error("Tribe membership load failed:", membershipError);
+            }
+
+            const tribeIds = (membershipData ?? []).map(
+                (membership) => membership.tribe_id
+            );
+
+            if (tribeIds.length > 0) {
+                const { data: tribeData, error: tribeError } = await supabase
+                    .from("tribes")
+                    .select("id, name, description, image_url")
+                    .in("id", tribeIds)
+                    .order("name");
+
+                if (tribeError) {
+                    console.error("Tribe load failed:", tribeError);
+                } else {
+                    setTribes(tribeData ?? []);
+                }
+            } else {
+                setTribes([]);
+            }
+
+            const { data: historyData, error: historyError } =
+                await supabase.rpc("get_my_battle_history");
+
+            if (historyError) {
+                console.error("Battle history load failed:", historyError);
+            } else {
+                setBattleHistory(historyData ?? []);
+            }
+
+            const { data: createdData, error: createdError } =
+                await supabase.rpc("get_my_created_fanwars");
+
+            if (createdError) {
+                console.error("Created FanWars load failed:", createdError);
+            } else {
+                const rows = createdData ?? [];
+                const { data: covers } = rows.length ? await supabase.from("battles")
+                    .select("id, image_url").in("id", rows.map((row: CreatedFanWar) => row.id)) : { data: [] };
+                setCreatedFanWars(rows.map((row: CreatedFanWar) => ({ ...row,
+                    image_url: covers?.find(cover => cover.id === row.id)?.image_url ?? null,
+                })));
+            }
+
+            setLoading(false);
         }
 
-        const { data: historyData, error: historyError } =
-            await supabase.rpc("get_my_battle_history");
-
-        if (historyError) {
-            console.error("Battle history load failed:", historyError);
-        } else {
-            setBattleHistory(historyData ?? []);
-        }
-
-        const { data: createdData, error: createdError } =
-            await supabase.rpc("get_my_created_fanwars");
-
-        if (createdError) {
-            console.error("Created FanWars load failed:", createdError);
-        } else {
-            setCreatedFanWars(createdData ?? []);
-        }
-
-        setLoading(false);
-    }
+        void loadProfile();
+    }, [router]);
 
     if (loading) {
         return (
             <div className="min-h-screen bg-[#fcfbf8]">
-                <AppHeader showBackToHome />
+                <AppHeader />
 
                 <main className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
                     <div className="rounded-[28px] border border-black/[0.06] bg-white p-8 shadow-sm">
@@ -178,7 +184,7 @@ export default function ProfilePage() {
 
     return (
         <div className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-            <AppHeader showBackToHome />
+            <AppHeader />
 
             <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:py-12">
                 {error && (
@@ -226,10 +232,9 @@ export default function ProfilePage() {
                         />
 
                         {!profile.banner_url && (
-                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-r from-purple-100 via-fuchsia-50 to-pink-100">
-                                <p className="text-sm font-extrabold text-[#777286]">
-                                    Add a cover photo
-                                </p>
+                            <div className="pointer-events-none absolute inset-0">
+                                <SidePhoto name={profile.bio || "FanWars community"} parentTopic={tribes[0]?.name} showLabel={false} sizes="(max-width: 768px) 100vw, 1024px" />
+                                <span className="absolute right-4 top-4 rounded-full bg-black/50 px-4 py-2 text-xs font-bold text-white">Add your own cover photo</span>
                             </div>
                         )}
                     </div>
@@ -246,7 +251,7 @@ export default function ProfilePage() {
                                         currentUrl={profile.avatar_url}
                                         aspect="square"
                                         label="Add photo"
-                                        className="h-full w-full rounded-full border-4 border-white bg-gradient-to-br from-purple-500 to-pink-500 shadow-xl"
+                                        className="h-full w-full rounded-full border-4 border-white bg-gradient-to-br from-brand-500 to-rose-500 shadow-xl"
                                         onUploaded={async (url) => {
                                             const { error: updateError } =
                                                 await supabase
@@ -304,7 +309,7 @@ export default function ProfilePage() {
 
                         {/* Profile metadata */}
                         <div className="mt-6 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+                            <span className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-700">
                                 FanWars member
                             </span>
 
@@ -355,7 +360,7 @@ export default function ProfilePage() {
                 <section className="mt-8">
                     <div className="mb-4 flex items-end justify-between gap-4">
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-600">
                                 Your communities
                             </p>
 
@@ -366,7 +371,7 @@ export default function ProfilePage() {
 
                         <Link
                             href="/tribes"
-                            className="text-sm font-extrabold text-purple-600 hover:text-purple-700"
+                            className="text-sm font-extrabold text-brand-600 hover:text-brand-700"
                         >
                             Manage Tribes →
                         </Link>
@@ -374,7 +379,7 @@ export default function ProfilePage() {
 
                     {tribes.length === 0 ? (
                         <div className="rounded-[24px] border border-dashed border-black/[0.10] bg-white p-8 text-center">
-                            <p className="font-bold">You haven't joined a Tribe yet.</p>
+                            <p className="font-bold">You haven&apos;t joined a Tribe yet.</p>
 
                             <Link
                                 href="/tribes"
@@ -391,8 +396,8 @@ export default function ProfilePage() {
                                     className="rounded-[24px] border border-black/[0.06] bg-white p-5 shadow-sm"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-xl">
-                                            ✦
+                                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-brand-50">
+                                            <SidePhoto name={tribe.name} description={tribe.description} image={tribe.image_url} showLabel={false} sizes="48px" />
                                         </div>
 
                                         <div className="min-w-0">
@@ -415,7 +420,7 @@ export default function ProfilePage() {
                 <section className="mt-10">
                     <div className="mb-4 flex items-end justify-between gap-4">
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-600">
                                 Your creations
                             </p>
 
@@ -426,7 +431,7 @@ export default function ProfilePage() {
 
                         <Link
                             href="/create-fanwar"
-                            className="text-sm font-extrabold text-purple-600 hover:text-purple-700"
+                            className="text-sm font-extrabold text-brand-600 hover:text-brand-700"
                         >
                             Create FanWar →
                         </Link>
@@ -477,10 +482,11 @@ export default function ProfilePage() {
                                             : ""
                                             }`}
                                     >
+                                        <div className="mb-4 overflow-hidden rounded-2xl"><BattleCover title={fanWar.title} imageUrl={fanWar.image_url ?? null} parentTopic={fanWar.category} compact /></div>
                                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                             <div className="min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-700">
+                                                    <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-brand-700">
                                                         {fanWar.category}
                                                     </span>
 
@@ -532,7 +538,7 @@ export default function ProfilePage() {
                                             </div>
 
                                             {fanWar.status === "live" && (
-                                                <span className="shrink-0 text-lg font-black text-purple-600">
+                                                <span className="shrink-0 text-lg font-black text-brand-600">
                                                     →
                                                 </span>
                                             )}
@@ -561,7 +567,7 @@ export default function ProfilePage() {
                 <section className="mt-10 rounded-[28px] bg-[#171525] p-7 text-white sm:p-8">
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-300">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-300">
                                 Keep playing
                             </p>
 

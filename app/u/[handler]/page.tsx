@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import AppHeader from "@/components/app-header";
+import { SidePhoto } from "@/components/battle-cover";
 import FanWarsLogo from "@/components/fanwars-logo";
 import { supabase } from "@/lib/supabase";
 
@@ -14,6 +15,7 @@ type PublicFanPage = {
     handler: string;
     display_name: string;
     avatar_url: string | null;
+    banner_url?: string | null;
     bio: string | null;
     created_at: string;
     tribe_count: number;
@@ -23,6 +25,7 @@ type PublicFanPage = {
         id: number;
         name: string;
         description: string | null;
+        image_url?: string | null;
     }[];
     battle_history: {
         battle_id: number;
@@ -68,7 +71,18 @@ export default function PublicFanPage() {
                 return;
             }
 
-            setFanPage(data[0] as PublicFanPage);
+            const page = data[0] as PublicFanPage;
+            // Existing RLS decides which uploads may be read; denied/missing rows use defaults.
+            const [{ data: cover }, { data: tribeCovers }] = await Promise.all([
+                supabase.from("profiles").select("banner_url").eq("id", page.id).maybeSingle(),
+                page.tribes.length ? supabase.from("tribes").select("id, image_url")
+                    .in("id", page.tribes.map(tribe => tribe.id)) : Promise.resolve({ data: [] }),
+            ]);
+            setFanPage({ ...page, banner_url: cover?.banner_url ?? null,
+                tribes: page.tribes.map(tribe => ({ ...tribe,
+                    image_url: tribeCovers?.find(cover => cover.id === tribe.id)?.image_url ?? null,
+                })),
+            });
             setLoading(false);
         }
 
@@ -98,7 +112,7 @@ export default function PublicFanPage() {
 
                 <main className="mx-auto max-w-3xl px-5 py-16 sm:px-8">
                     <div className="rounded-[30px] border border-black/[0.06] bg-white p-10 text-center shadow-sm">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-purple-50">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-50">
                             <FanWarsLogo
                                 href="/"
                                 showName={false}
@@ -144,12 +158,12 @@ export default function PublicFanPage() {
             <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:py-12">
                 {/* FanPage Hero */}
                 <section className="overflow-hidden rounded-[30px] border border-black/[0.06] bg-white shadow-sm">
-                    <div className="h-32 bg-gradient-to-r from-purple-100 via-fuchsia-50 to-pink-100 sm:h-40" />
+                    <div className="h-48 sm:h-60"><SidePhoto name={fanPage.bio || "FanWars community"} image={fanPage.banner_url} parentTopic={fanPage.tribes[0]?.name} showLabel={false} sizes="(max-width: 768px) 100vw, 1024px" /></div>
 
                     <div className="px-6 pb-7 sm:px-8">
                         <div className="-mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
                             <div className="flex items-end gap-4">
-                                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-gradient-to-br from-purple-500 to-pink-500 text-3xl font-black text-white shadow-lg sm:h-28 sm:w-28">
+                                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-gradient-to-br from-brand-500 to-rose-500 text-3xl font-black text-white shadow-lg sm:h-28 sm:w-28">
                                     {fanPage.avatar_url ? (
                                         <img
                                             src={fanPage.avatar_url}
@@ -189,7 +203,7 @@ export default function PublicFanPage() {
                         )}
 
                         <div className="mt-6 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+                            <span className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-700">
                                 FanWars member
                             </span>
 
@@ -260,7 +274,7 @@ export default function PublicFanPage() {
                 {/* Tribes */}
                 <section className="mt-8">
                     <div className="mb-4">
-                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-600">
                             Part of the community
                         </p>
 
@@ -283,9 +297,7 @@ export default function PublicFanPage() {
                                     className="rounded-[24px] border border-black/[0.06] bg-white p-5 shadow-sm"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-xl">
-                                            ✦
-                                        </div>
+                                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl"><SidePhoto name={tribe.name} description={tribe.description} image={tribe.image_url} showLabel={false} sizes="64px" /></div>
 
                                         <div className="min-w-0">
                                             <h3 className="truncate font-black">
@@ -308,7 +320,7 @@ export default function PublicFanPage() {
                 {/* Battle History */}
                 <section className="mt-10">
                     <div className="mb-4">
-                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-600">
                             FanWars record
                         </p>
 
@@ -332,9 +344,10 @@ export default function PublicFanPage() {
                                         href={`/battle/${battle.battle_id}`}
                                         className="group flex items-center justify-between gap-4 rounded-[22px] border border-black/[0.06] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                                     >
+                                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl"><SidePhoto name={battle.option_name} showLabel={false} sizes="80px" /></div>
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-700">
+                                                <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-brand-700">
                                                     {battle.category}
                                                 </span>
 
@@ -356,7 +369,7 @@ export default function PublicFanPage() {
                                             </p>
                                         </div>
 
-                                        <span className="shrink-0 text-lg font-black text-purple-600 transition group-hover:translate-x-1">
+                                        <span className="shrink-0 text-lg font-black text-brand-600 transition group-hover:translate-x-1">
                                             →
                                         </span>
                                     </Link>
@@ -368,7 +381,7 @@ export default function PublicFanPage() {
 
                 {/* Public identity */}
                 <section className="mt-10 rounded-[28px] bg-[#171525] p-7 text-white sm:p-8">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-300">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-300">
                         Fan Identity
                     </p>
 

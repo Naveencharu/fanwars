@@ -1,0 +1,251 @@
+{
+  "status": "validated-local-Supabase-17.11; four-local-migrations; production-adoption-pending",
+  "postgres_version": "17.6",
+  "captured_at": "2026-10-02T11:10:10.332351+00:00",
+  "details_captured_at": "2026-10-02T11:31:03.08875+00:00",
+  "source_sha256": "a78018fa6f5fa24afcd3f8f71c8e7bf1f25c729fded12132be4ffd900faaa103",
+  "details_sha256": "883cb63fad5f0cb3a8cd2c46054656e84388cd0a4f285e6a2dbf4d91f474bf53",
+  "counts": {
+    "tables": 12,
+    "sequences": 7,
+    "columns": 76,
+    "functions": 24,
+    "indexes": 37,
+    "constraints": 46,
+    "public_policies": 15,
+    "storage_policies": 4,
+    "application_triggers": 4
+  },
+  "public_schema": {
+    "owner": "pg_database_owner",
+    "nspacl": [
+      "pg_database_owner=UC/pg_database_owner",
+      "=U/pg_database_owner",
+      "postgres=U/pg_database_owner",
+      "anon=U/pg_database_owner",
+      "authenticated=U/pg_database_owner",
+      "service_role=U/pg_database_owner"
+    ],
+    "schema_name": "public"
+  },
+  "public_default_privileges": [
+    {
+      "defaclacl": [
+        "postgres=rwU/postgres",
+        "anon=rwU/postgres",
+        "authenticated=rwU/postgres",
+        "service_role=rwU/postgres"
+      ],
+      "role_name": "postgres",
+      "schema_name": "public",
+      "defaclobjtype": "S"
+    },
+    {
+      "defaclacl": [
+        "postgres=X/postgres",
+        "anon=X/postgres",
+        "authenticated=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "role_name": "postgres",
+      "schema_name": "public",
+      "defaclobjtype": "f"
+    },
+    {
+      "defaclacl": [
+        "postgres=arwdDxtm/postgres",
+        "anon=arwdDxtm/postgres",
+        "authenticated=arwdDxtm/postgres",
+        "service_role=arwdDxtm/postgres"
+      ],
+      "role_name": "postgres",
+      "schema_name": "public",
+      "defaclobjtype": "r"
+    },
+    {
+      "defaclacl": [
+        "postgres=rwU/supabase_admin",
+        "anon=rwU/supabase_admin",
+        "authenticated=rwU/supabase_admin",
+        "service_role=rwU/supabase_admin"
+      ],
+      "role_name": "supabase_admin",
+      "schema_name": "public",
+      "defaclobjtype": "S"
+    },
+    {
+      "defaclacl": [
+        "postgres=X/supabase_admin",
+        "anon=X/supabase_admin",
+        "authenticated=X/supabase_admin",
+        "service_role=X/supabase_admin"
+      ],
+      "role_name": "supabase_admin",
+      "schema_name": "public",
+      "defaclobjtype": "f"
+    },
+    {
+      "defaclacl": [
+        "postgres=arwdDxtm/supabase_admin",
+        "anon=arwdDxtm/supabase_admin",
+        "authenticated=arwdDxtm/supabase_admin",
+        "service_role=arwdDxtm/supabase_admin"
+      ],
+      "role_name": "supabase_admin",
+      "schema_name": "public",
+      "defaclobjtype": "r"
+    }
+  ],
+  "storage_bucket_configuration": [
+    {
+      "id": "fanwars-media",
+      "name": "fanwars-media",
+      "public": true,
+      "file_size_limit": 5242880,
+      "allowed_mime_types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    }
+  ],
+  "sequences": [
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "battle_options_id_seq"
+    },
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "battles_id_seq"
+    },
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "clans_id_seq"
+    },
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "fan_referrals_id_seq"
+    },
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "fan_reputation_events_id_seq"
+    },
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "tribes_id_seq"
+    },
+    {
+      "cycle": false,
+      "data_type": "bigint",
+      "max_value": "9223372036854775807",
+      "min_value": "1",
+      "cache_size": "1",
+      "schemaname": "public",
+      "start_value": "1",
+      "increment_by": "1",
+      "sequencename": "votes_id_seq"
+    }
+  ],
+  "extensions": [
+    {
+      "extname": "pg_stat_statements",
+      "extversion": "1.11",
+      "schema_name": "extensions"
+    },
+    {
+      "extname": "pgcrypto",
+      "extversion": "1.3",
+      "schema_name": "extensions"
+    },
+    {
+      "extname": "plpgsql",
+      "extversion": "1.0",
+      "schema_name": "pg_catalog"
+    },
+    {
+      "extname": "supabase_vault",
+      "extversion": "0.3.1",
+      "schema_name": "vault"
+    },
+    {
+      "extname": "uuid-ossp",
+      "extversion": "1.1",
+      "schema_name": "extensions"
+    }
+  ],
+  "publication_configuration": [
+    {
+      "pubname": "supabase_realtime",
+      "pubdelete": true,
+      "pubinsert": true,
+      "pubupdate": true,
+      "pubtruncate": true,
+      "puballtables": false
+    }
+  ],
+  "publication_tables": [],
+  "excluded": "Production application records, credentials, managed auth/storage/Vault internals and uploaded files. Public schema/default privileges and extension/publication prerequisites match the local Supabase environment; bucket settings are now a separate migration.",
+  "local_validation": {
+    "engine": "Supabase PostgreSQL 17.11",
+    "cli": "2.119.0",
+    "checks": 16,
+    "infrastructure_differences": 0,
+    "production_accessed": false,
+    "migrations": [
+      "20261002140000",
+      "20261002140100",
+      "20261002140200",
+      "20261002140300"
+    ],
+    "limitations": [
+      "Browser/HTTP and concurrency tests pending",
+      "Production capture is PostgreSQL 17.6",
+      "Five physical column numbers differ due to historical dropped columns; logical order matches"
+    ],
+    "functionality_fixes": [
+      "Public results restricted to live/closed locally; original production RPC unchanged"
+    ]
+  }
+}

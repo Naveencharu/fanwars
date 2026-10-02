@@ -2,362 +2,137 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-
+import { usePathname, useRouter } from "next/navigation";
 import FanWarsLogo from "@/components/fanwars-logo";
 import { supabase } from "@/lib/supabase";
 
-type AppHeaderProps = {
-    showBackToHome?: boolean;
-};
-
-export default function AppHeader({
-    showBackToHome = false,
-}: AppHeaderProps) {
+export default function AppHeader() {
     const pathname = usePathname();
-
-    const isActive = (path: string) =>
-        pathname === path ||
-        (path === "/admin/fanwars" &&
-            pathname.startsWith("/admin/fanwars"));
-
+    const router = useRouter();
+    const [loggedIn, setLoggedIn] = useState(false);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [authRevision, setAuthRevision] = useState(0);
     const [displayName, setDisplayName] = useState("");
-    const [handler, setHandler] = useState("");
     const [isModerator, setIsModerator] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
+    const [signingOut, setSigningOut] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === "SIGNED_OUT" || event === "SIGNED_IN" || event === "USER_UPDATED") {
+                // Keep the auth callback synchronous; load account data in the effect.
+                setAuthRevision(value => value + 1);
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        async function loadAccount() {
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (!active) return;
+                if (sessionError) throw sessionError;
+                setError("");
+                setLoggedIn(Boolean(session));
+                setDisplayName("");
+                setIsModerator(false);
+                setPendingCount(0);
+                setAuthLoading(false);
+                if (!session) return;
+                const { data: profile } = await supabase.from("profiles")
+                    .select("display_name").eq("id", session.user.id).maybeSingle();
+                if (!active) return;
+                setDisplayName(profile?.display_name ?? "");
+                const { data: moderator, error: moderatorError } = await supabase.rpc("is_fanwar_moderator");
+                if (!active || moderatorError) return;
+                setIsModerator(Boolean(moderator));
+                if (moderator) {
+                    const { count } = await supabase.from("battles")
+                        .select("id", { count: "exact", head: true }).eq("status", "pending");
+                    if (active) setPendingCount(count ?? 0);
+                }
+            } catch {
+                if (active) {
+                    setAuthLoading(false);
+                    setError("Could not check your session. Please refresh and try again.");
+                }
+            }
+        }
+        void loadAccount();
+        return () => { active = false; };
+    }, [pathname, authRevision]);
+
+    useEffect(() => {
+        async function refreshCount() {
+            if (!isModerator) return;
+            const { count, error: countError } = await supabase.from("battles")
+                .select("id", { count: "exact", head: true }).eq("status", "pending");
+            if (!countError) setPendingCount(count ?? 0);
+        }
+        window.addEventListener("fanwars:moderation-updated", refreshCount);
+        return () => window.removeEventListener("fanwars:moderation-updated", refreshCount);
+    }, [isModerator]);
 
     async function handleSignOut() {
-        await supabase.auth.signOut();
-        window.location.href = "/login";
+        if (signingOut) return;
+        setSigningOut(true);
+        setError("");
+        try {
+            const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+            if (signOutError) throw signOutError;
+            setLoggedIn(false);
+            setDisplayName("");
+            setIsModerator(false);
+            setPendingCount(0);
+            router.replace("/");
+            router.refresh();
+        } catch {
+            setError("Could not sign out. Please try again.");
+        } finally {
+            setSigningOut(false);
+        }
     }
 
-    useEffect(() => {
-        async function loadCurrentUser() {
-            try {
-                const {
-                    data: { user },
-                } = await supabase.auth.getUser();
+    const links = loggedIn
+        ? [["Home", "/home"], ["Tribes", "/tribes"], ["Rankings", "/rankings"], ["Create FanWar", "/create-fanwar"]]
+        : [["FanWars", "/#battles"], ["Tribes", "/#tribes"], ["How it works", "/#how-it-works"]];
+    if (loggedIn && isModerator) links.push([pendingCount ? "Moderation (" + pendingCount + ")" : "Moderation", "/admin/fanwars"]);
 
-                if (!user) return;
+    function navigation(mobile: boolean) {
+        return <nav aria-label={mobile ? "Mobile navigation" : "Main navigation"}
+            className={mobile ? "flex gap-5 overflow-x-auto px-5 py-3 md:hidden" : "hidden items-center gap-5 md:flex"}>
+            {links.map(([label, href]) => <Link key={href} href={href}
+                aria-current={pathname === href ? "page" : undefined}
+                className={"whitespace-nowrap text-xs font-bold transition hover:text-brand-600 " + (pathname === href ? "text-brand-600" : "text-[#686577]")}>
+                {label}
+            </Link>)}
+        </nav>;
+    }
 
-                const { data: profile } = await supabase
-                    .from("profiles")
-                    .select("display_name, handler")
-                    .eq("id", user.id)
-                    .maybeSingle();
-
-                if (profile) {
-                    setDisplayName(profile.display_name ?? "");
-                    setHandler(profile.handler ?? "");
-                }
-
-                /*
-                 * Check whether the current user is a FanWars moderator.
-                 */
-                const {
-                    data: moderator,
-                    error: moderatorError,
-                } = await supabase.rpc("is_fanwar_moderator");
-
-                if (moderatorError) {
-                    console.error(
-                        "Moderator check failed:",
-                        moderatorError
-                    );
-                    return;
-                }
-
-                if (!moderator) {
-                    setIsModerator(false);
-                    return;
-                }
-
-                setIsModerator(true);
-
-                /*
-                 * Moderator only:
-                 * get the number of FanWars waiting for review.
-                 */
-                const {
-                    count,
-                    error: countError,
-                } = await supabase
-                    .from("battles")
-                    .select("id", {
-                        count: "exact",
-                        head: true,
-                    })
-                    .eq("status", "pending");
-
-                if (countError) {
-                    console.error(
-                        "Pending FanWar count failed:",
-                        countError
-                    );
-                    return;
-                }
-
-                setPendingCount(count ?? 0);
-            } catch (error) {
-                console.error(
-                    "AppHeader user loading error:",
-                    error
-                );
-            }
-        }
-
-        loadCurrentUser();
-    }, [pathname]);
-    useEffect(() => {
-        async function refreshModerationCount() {
-            if (!isModerator) return;
-
-            const { count, error: countError } = await supabase
-                .from("battles")
-                .select("id", {
-                    count: "exact",
-                    head: true,
-                })
-                .eq("status", "pending");
-
-            if (countError) {
-                console.error(
-                    "Pending FanWar count refresh failed:",
-                    countError
-                );
-                return;
-            }
-
-            setPendingCount(count ?? 0);
-        }
-
-        function handleModerationUpdated() {
-            refreshModerationCount();
-        }
-
-        window.addEventListener(
-            "fanwars:moderation-updated",
-            handleModerationUpdated
-        );
-
-        return () => {
-            window.removeEventListener(
-                "fanwars:moderation-updated",
-                handleModerationUpdated
-            );
-        };
-    }, [isModerator]);
-    return (
-        <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/95 backdrop-blur">
-            <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
-                {/* Logo */}
-                <FanWarsLogo href="/" size="md" />
-
-                {/* Desktop Navigation */}
-                <nav className="hidden items-center gap-7 md:flex">
-                    <Link
-                        href="/home"
-                        className={`text-sm font-bold transition ${isActive("/home")
-                            ? "text-purple-600"
-                            : "text-[#686577] hover:text-[#171525]"
-                            }`}
-                    >
-                        Home
+    return <header className="sticky top-0 z-40 border-b border-brand-100/60 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
+            <FanWarsLogo href="/" size="md" />
+            {navigation(false)}
+            <div className="flex shrink-0 items-center gap-2">
+                {!authLoading && (loggedIn ? <>
+                    <Link href="/profile" aria-label="Open your profile" aria-current={pathname === "/profile" ? "page" : undefined}
+                        className="rounded-full border border-brand-100 bg-brand-50 px-3 py-2 text-xs font-extrabold text-brand-700">
+                        <span className="hidden lg:inline">{displayName || "My"} / </span>Profile
                     </Link>
-
-                    <Link
-                        href="/tribes"
-                        className={`text-sm font-bold transition ${isActive("/tribes")
-                            ? "text-purple-600"
-                            : "text-[#686577] hover:text-[#171525]"
-                            }`}
-                    >
-                        Tribes
-                    </Link>
-
-                    <Link
-                        href="/rankings"
-                        className={`text-sm font-bold transition ${isActive("/rankings")
-                            ? "text-purple-600"
-                            : "text-[#686577] hover:text-[#171525]"
-                            }`}
-                    >
-                        Rankings
-                    </Link>
-
-                    <Link
-                        href="/create-fanwar"
-                        className={`text-sm font-bold transition ${isActive("/create-fanwar")
-                            ? "text-purple-600"
-                            : "text-[#686577] hover:text-[#171525]"
-                            }`}
-                    >
-                        Create FanWar
-                    </Link>
-
-                    {isModerator && (
-                        <Link
-                            href="/admin/fanwars"
-                            className={`flex items-center gap-2 text-sm font-bold transition ${isActive("/admin/fanwars")
-                                ? "text-purple-600"
-                                : "text-[#686577] hover:text-[#171525]"
-                                }`}
-                        >
-                            Moderation
-
-                            {pendingCount > 0 && (
-                                <span className="flex min-w-5 items-center justify-center rounded-full bg-purple-600 px-1.5 py-0.5 text-[10px] font-black text-white">
-                                    {pendingCount}
-                                </span>
-                            )}
-                        </Link>
-                    )}
-
-                    <Link
-                        href="/profile"
-                        className={`text-sm font-bold transition ${isActive("/profile")
-                            ? "text-purple-600"
-                            : "text-[#686577] hover:text-[#171525]"
-                            }`}
-                    >
-                        Profile
-                    </Link>
-
-                    {showBackToHome && (
-                        <Link
-                            href="/home"
-                            className="rounded-full bg-[#171525] px-4 py-2 text-xs font-extrabold text-white transition hover:opacity-90"
-                        >
-                            ← Back to Home
-                        </Link>
-                    )}
-                </nav>
-
-                {/* Current User */}
-                <Link
-                    href="/profile"
-                    className="hidden items-center gap-3 rounded-full border border-purple-100 bg-white px-4 py-2 md:flex"
-                >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-xs font-black text-purple-700">
-                        {displayName
-                            ? displayName.charAt(0).toUpperCase()
-                            : "F"}
-                    </div>
-
-                    <div className="min-w-0 text-left leading-tight">
-                        <p className="max-w-[140px] truncate text-xs font-extrabold text-[#171525]">
-                            {displayName || "Fan"}
-                        </p>
-
-                        <p className="max-w-[140px] truncate text-[10px] font-semibold text-[#8a8395]">
-                            {handler ? `@${handler}` : ""}
-                        </p>
-                    </div>
-                </Link>
-
-                <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="hidden rounded-full border border-black/[0.08] bg-white px-4 py-2 text-xs font-extrabold text-[#171525] transition hover:bg-black/[0.03] md:block"
-                >
-                    Sign Out
-                </button>
-
-                {/* Mobile */}
-                <div className="flex items-center gap-2 md:hidden">
-                    {showBackToHome && (
-                        <Link
-                            href="/home"
-                            className="rounded-full bg-[#171525] px-3 py-2 text-xs font-extrabold text-white"
-                        >
-                            ← Home
-                        </Link>
-                    )}
-
-                    <Link
-                        href="/profile"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-50 text-sm font-black text-purple-700"
-                        aria-label="Profile"
-                    >
-                        {displayName
-                            ? displayName.charAt(0).toUpperCase()
-                            : "F"}
-                    </Link>
-                </div>
+                    <button type="button" onClick={handleSignOut} disabled={signingOut}
+                        className="rounded-full border border-black/10 px-3 py-2 text-xs font-extrabold disabled:opacity-50">
+                        {signingOut ? "Signing out..." : "Sign out"}
+                    </button>
+                </> : <>
+                    <Link href="/login" className="px-2 py-2 text-xs font-bold">Log in</Link>
+                    <Link href="/signup" className="rounded-full bg-brand-600 px-3 py-2 text-xs font-extrabold text-white">Join</Link>
+                </>)}
             </div>
-
-            {/* Mobile Navigation */}
-            <div className="border-t border-black/[0.05] md:hidden">
-                <nav className="mx-auto flex max-w-7xl items-center justify-center gap-5 overflow-x-auto px-5 py-3">
-                    <Link
-                        href="/home"
-                        className={`whitespace-nowrap text-xs font-bold ${isActive("/home")
-                            ? "text-purple-600"
-                            : "text-[#686577]"
-                            }`}
-                    >
-                        Home
-                    </Link>
-
-                    <Link
-                        href="/tribes"
-                        className={`whitespace-nowrap text-xs font-bold ${isActive("/tribes")
-                            ? "text-purple-600"
-                            : "text-[#686577]"
-                            }`}
-                    >
-                        Tribes
-                    </Link>
-
-                    <Link
-                        href="/rankings"
-                        className={`whitespace-nowrap text-xs font-bold ${isActive("/rankings")
-                            ? "text-purple-600"
-                            : "text-[#686577]"
-                            }`}
-                    >
-                        Rankings
-                    </Link>
-
-                    <Link
-                        href="/create-fanwar"
-                        className={`whitespace-nowrap text-xs font-bold ${isActive("/create-fanwar")
-                            ? "text-purple-600"
-                            : "text-[#686577]"
-                            }`}
-                    >
-                        Create
-                    </Link>
-
-                    {isModerator && (
-                        <Link
-                            href="/admin/fanwars"
-                            className={`flex items-center gap-1 whitespace-nowrap text-xs font-bold ${isActive("/admin/fanwars")
-                                ? "text-purple-600"
-                                : "text-[#686577]"
-                                }`}
-                        >
-                            Moderate
-
-                            {pendingCount > 0 && (
-                                <span className="flex min-w-4 items-center justify-center rounded-full bg-purple-600 px-1 py-0.5 text-[9px] font-black text-white">
-                                    {pendingCount}
-                                </span>
-                            )}
-                        </Link>
-                    )}
-
-                    <Link
-                        href="/profile"
-                        className={`whitespace-nowrap text-xs font-bold ${isActive("/profile")
-                            ? "text-purple-600"
-                            : "text-[#686577]"
-                            }`}
-                    >
-                        Profile
-                    </Link>
-                </nav>
-            </div>
-        </header>
-    );
+        </div>
+        <div className="mx-auto max-w-7xl border-t border-brand-100/50 md:hidden">{navigation(true)}</div>
+        {error && <p role="alert" className="mx-auto max-w-7xl px-5 pb-3 text-sm text-red-700">{error}</p>}
+    </header>;
 }

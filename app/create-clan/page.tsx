@@ -249,12 +249,12 @@ function CreateClanContent() {
 
                 <div className="mt-6 rounded-[2rem] border border-black/[0.06] bg-white p-6 shadow-sm sm:p-10">
                     <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-2xl">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-100 text-2xl">
                             🛡️
                         </div>
 
                         <div>
-                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-purple-600">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-brand-600">
                                 {tribe.name}
                             </p>
 
@@ -290,7 +290,7 @@ function CreateClanContent() {
                                 }
                                 maxLength={80}
                                 placeholder="Example: RCB Bengaluru Fans"
-                                className="mt-2 w-full rounded-2xl border border-black/10 bg-[#fcfbf8] px-4 py-3 text-sm font-semibold text-[#171525] outline-none transition focus:border-purple-400 focus:ring-4 focus:ring-purple-100"
+                                className="mt-2 w-full rounded-2xl border border-black/10 bg-[#fcfbf8] px-4 py-3 text-sm font-semibold text-[#171525] outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
                             />
 
                             <div className="mt-2 flex justify-between text-xs font-semibold text-[#888393]">
@@ -316,7 +316,7 @@ function CreateClanContent() {
                                 maxLength={500}
                                 rows={5}
                                 placeholder="Tell fans what brings this Clan together..."
-                                className="mt-2 w-full resize-none rounded-2xl border border-black/10 bg-[#fcfbf8] px-4 py-3 text-sm font-semibold leading-6 text-[#171525] outline-none transition focus:border-purple-400 focus:ring-4 focus:ring-purple-100"
+                                className="mt-2 w-full resize-none rounded-2xl border border-black/10 bg-[#fcfbf8] px-4 py-3 text-sm font-semibold leading-6 text-[#171525] outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
                             />
 
                             <div className="mt-2 flex justify-between text-xs font-semibold text-[#888393]">
@@ -325,8 +325,8 @@ function CreateClanContent() {
                             </div>
                         </div>
 
-                        <div className="rounded-2xl bg-purple-50 p-4">
-                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-purple-600">
+                        <div className="rounded-2xl bg-brand-50 p-4">
+                            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-600">
                                 Parent Tribe
                             </p>
 

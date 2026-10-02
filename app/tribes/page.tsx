@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AppHeader from "@/components/app-header";
+import { SidePhoto } from "@/components/battle-cover";
 import { supabase } from "@/lib/supabase";
 
 type Tribe = {
     id: number;
     name: string;
     description: string | null;
+    image_url: string | null;
 };
 
 export default function TribesPage() {
@@ -36,7 +38,7 @@ export default function TribesPage() {
                 const { data: tribeData, error: tribeError } =
                     await supabase
                         .from("tribes")
-                        .select("id, name, description")
+                        .select("id, name, description, image_url")
                         .order("id", { ascending: true });
 
                 if (tribeError) {
@@ -151,11 +153,11 @@ export default function TribesPage() {
 
     return (
         <main className="min-h-screen bg-[#fcfbf8] text-[#171525]">
-            <AppHeader showBackToHome />
+            <AppHeader />
 
             <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
                 <div className="max-w-3xl">
-                    <div className="text-xs font-black uppercase tracking-[0.16em] text-purple-600">
+                    <div className="text-xs font-black uppercase tracking-[0.16em] text-brand-600">
                         Your Passions
                     </div>
 
@@ -194,7 +196,7 @@ export default function TribesPage() {
                                     <div
                                         key={tribe.id}
                                         className={`relative rounded-[2rem] border transition ${selected
-                                                ? "border-purple-300 bg-purple-50 shadow-sm"
+                                                ? "border-brand-300 bg-brand-50 shadow-sm"
                                                 : "border-black/[0.06] bg-white hover:-translate-y-0.5 hover:shadow-md"
                                             }`}
                                     >
@@ -202,8 +204,8 @@ export default function TribesPage() {
                                             href={`/tribes/${tribe.id}`}
                                             className="block p-6 text-left"
                                         >
-                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 text-2xl">
-                                                🔥
+                                            <div className="-mx-6 -mt-6 h-44 overflow-hidden rounded-t-[2rem]">
+                                                <SidePhoto name={tribe.name} description={tribe.description} image={tribe.image_url} />
                                             </div>
 
                                             <h2 className="mt-5 text-lg font-black">
@@ -216,7 +218,7 @@ export default function TribesPage() {
                                                 </p>
                                             )}
 
-                                            <div className="mt-5 text-xs font-extrabold text-purple-600">
+                                            <div className="mt-5 text-xs font-extrabold text-brand-600">
                                                 View Tribe →
                                             </div>
                                         </Link>
@@ -230,8 +232,8 @@ export default function TribesPage() {
                                                     : `Select ${tribe.name}`
                                             }
                                             className={`absolute right-5 top-5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-black transition ${selected
-                                                    ? "bg-purple-600 text-white"
-                                                    : "border border-black/10 bg-white text-transparent hover:border-purple-300"
+                                                    ? "bg-brand-600 text-white"
+                                                    : "border border-black/10 bg-white text-transparent hover:border-brand-300"
                                                 }`}
                                         >
                                             ✓

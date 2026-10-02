@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { supabase } from "@/lib/supabase";
+import { croppedImageError, imageExtension, imageFileError } from "@/lib/media-upload";
 
 type ImageUploadProps = {
     userId: string;
@@ -99,13 +100,9 @@ export default function ImageUpload({
     function openEditor(file: File) {
         setError("");
 
-        if (!file.type.startsWith("image/")) {
-            setError("Please select an image file.");
-            return;
-        }
-
-        if (file.size > 10 * 1024 * 1024) {
-            setError("Image must be smaller than 10 MB.");
+        const validationError = imageFileError(file);
+        if (validationError) {
+            setError(validationError);
             return;
         }
 
@@ -137,7 +134,7 @@ export default function ImageUpload({
     }
 
     async function handleSave() {
-        if (!imageSrc || !croppedAreaPixels) {
+        if (!imageSrc || !croppedAreaPixels || uploading) {
             return;
         }
 
@@ -150,14 +147,19 @@ export default function ImageUpload({
                 croppedAreaPixels
             );
 
-            const filePath = `${userId}/${folder}/${crypto.randomUUID()}.webp`;
+            const validationError = croppedImageError(blob);
+            if (validationError) {
+                setError(validationError);
+                return;
+            }
+            const filePath = `${userId}/${folder}/${crypto.randomUUID()}.${imageExtension(blob.type)}`;
 
             const { error: uploadError } = await supabase.storage
                 .from("fanwars-media")
                 .upload(filePath, blob, {
                     cacheControl: "3600",
                     upsert: false,
-                    contentType: "image/webp",
+                    contentType: blob.type,
                 });
 
             if (uploadError) {
@@ -184,6 +186,7 @@ export default function ImageUpload({
     }
 
     function handleCancel() {
+        if (uploading) return;
         if (imageSrc) {
             URL.revokeObjectURL(imageSrc);
         }
@@ -192,6 +195,7 @@ export default function ImageUpload({
         setZoom(1);
         setCrop({ x: 0, y: 0 });
         setCroppedAreaPixels(null);
+        setError("");
     }
 
     return (
@@ -243,8 +247,8 @@ export default function ImageUpload({
                 className="hidden"
             />
 
-            {error && (
-                <p className="mt-2 text-xs font-semibold text-red-600">
+            {error && !imageSrc && (
+                <p role="alert" className="mt-2 text-xs font-semibold text-red-600">
                     {error}
                 </p>
             )}
@@ -266,6 +270,7 @@ export default function ImageUpload({
                             <button
                                 type="button"
                                 onClick={handleCancel}
+                                disabled={uploading}
                                 className="rounded-full px-3 py-2 text-sm font-bold text-[#686577] hover:bg-black/[0.04]"
                             >
                                 ✕
@@ -286,6 +291,11 @@ export default function ImageUpload({
                         </div>
 
                         <div className="px-5 py-5">
+                            {error && (
+                                <p role="alert" className="mb-3 text-sm font-semibold text-red-600">
+                                    {error}
+                                </p>
+                            )}
                             <div className="flex items-center gap-3">
                                 <span className="text-sm">
                                     🔍
@@ -302,7 +312,7 @@ export default function ImageUpload({
                                             Number(event.target.value)
                                         )
                                     }
-                                    className="w-full accent-purple-600"
+                                    className="w-full accent-brand-600"
                                 />
 
                                 <span className="text-sm">
@@ -314,6 +324,7 @@ export default function ImageUpload({
                                 <button
                                     type="button"
                                     onClick={handleCancel}
+                                    disabled={uploading}
                                     className="rounded-full border border-black/[0.08] px-5 py-2.5 text-sm font-extrabold text-[#171525]"
                                 >
                                     Cancel

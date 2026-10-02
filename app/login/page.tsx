@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import FanWarsLogo from "@/components/fanwars-logo";
 import { supabase } from "@/lib/supabase";
+import { getAuthDestination } from "@/lib/auth-redirect";
 
 function LoginPageContent() {
     const router = useRouter();
@@ -87,25 +88,13 @@ function LoginPageContent() {
             }
 
             if (profile) {
-                if (redirect) {
-                    const redirectUrl = new URL(
-                        redirect,
-                        window.location.origin
-                    );
-
-                    if (ref && !redirectUrl.searchParams.has("ref")) {
-                        redirectUrl.searchParams.set("ref", ref);
-                    }
-
-                    router.replace(
-                        `${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`
-                    );
-                } else {
-                    router.replace("/home");
-                }
+                router.replace(getAuthDestination(redirect, ref, window.location.origin));
             } else {
-                const onboardingUrl = ref
-                    ? `/onboarding?ref=${encodeURIComponent(ref)}`
+                const onboardingParams = new URLSearchParams();
+                if (ref) onboardingParams.set("ref", ref);
+                if (redirect) onboardingParams.set("redirect", redirect);
+                const onboardingUrl = onboardingParams.size
+                    ? `/onboarding?${onboardingParams.toString()}`
                     : "/onboarding";
 
                 router.replace(onboardingUrl);
@@ -130,7 +119,7 @@ function LoginPageContent() {
                 {/* Logo */}
                 <div className="mb-8 text-center">
                     <div className="flex justify-center">
-                        <FanWarsLogo href="/" size="lg" />
+                        <FanWarsLogo href="/" size="md" />
                     </div>
 
                     <p className="mt-4 text-sm font-semibold text-[#777286]">
@@ -176,7 +165,7 @@ function LoginPageContent() {
                                 }
                             }}
                             placeholder="you@example.com"
-                            className="w-full rounded-2xl border border-black/[0.08] bg-[#fcfbf8] px-4 py-3.5 text-sm font-semibold text-[#171525] outline-none transition placeholder:text-[#aaa4b1] focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
+                            className="w-full rounded-2xl border border-black/[0.08] bg-[#fcfbf8] px-4 py-3.5 text-sm font-semibold text-[#171525] outline-none transition placeholder:text-[#aaa4b1] focus:border-brand-400 focus:bg-white focus:ring-4 focus:ring-brand-100"
                         />
                     </div>
 
@@ -204,7 +193,7 @@ function LoginPageContent() {
                                 }
                             }}
                             placeholder="Enter your password"
-                            className="w-full rounded-2xl border border-black/[0.08] bg-[#fcfbf8] px-4 py-3.5 text-sm font-semibold text-[#171525] outline-none transition placeholder:text-[#aaa4b1] focus:border-purple-400 focus:bg-white focus:ring-4 focus:ring-purple-100"
+                            className="w-full rounded-2xl border border-black/[0.08] bg-[#fcfbf8] px-4 py-3.5 text-sm font-semibold text-[#171525] outline-none transition placeholder:text-[#aaa4b1] focus:border-brand-400 focus:bg-white focus:ring-4 focus:ring-brand-100"
                         />
                     </div>
 
@@ -227,7 +216,7 @@ function LoginPageContent() {
 
                     {/* Signup */}
                     <p className="mt-6 text-center text-sm font-semibold text-[#777286]">
-                        Don't have a FanWars account?{" "}
+                        Don&apos;t have a FanWars account?{" "}
                         <Link
                             href={
                                 ref
@@ -239,7 +228,7 @@ function LoginPageContent() {
                                         ? `/signup?redirect=${encodeURIComponent(redirect)}`
                                         : "/signup"
                             }
-                            className="font-extrabold text-purple-600 hover:text-purple-700"
+                            className="font-extrabold text-brand-600 hover:text-brand-700"
                         >
                             Sign up
                         </Link>
@@ -250,7 +239,7 @@ function LoginPageContent() {
                 <div className="mt-6 text-center">
                     <Link
                         href="/"
-                        className="text-sm font-bold text-[#777286] hover:text-purple-600"
+                        className="text-sm font-bold text-[#777286] hover:text-brand-600"
                     >
                         ← Back to FanWars
                     </Link>
