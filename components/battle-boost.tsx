@@ -42,7 +42,6 @@ export default function BattleBoost({ closed, sideName, onShare }: {
                 className="mt-4 rounded-full bg-[#171525] px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50">
                 {sharing ? "Opening share..." : "Invite fans / copy link"}
             </button>
-            <p className="mt-4 border-t border-brand-100 pt-4 text-xs leading-5 text-[#686577]">Paid boosts are being planned. Pricing and how they affect scores are still to be decided.</p>
         </section>}
     </div>;
 }
