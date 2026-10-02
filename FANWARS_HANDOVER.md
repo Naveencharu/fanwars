@@ -423,3 +423,17 @@ remain ignored. GitHub deployment records confirm Vercel Production deploys main
 The historical fanwars-poc.vercel.app address returned DEPLOYMENT_NOT_FOUND.
 Production database access is not configured in this workspace; database migration
 application and history adoption still require a verified production connection.
+
+### App published for initial users - 2026-10-03
+
+Release eaee036 was pushed to GitHub main. GitHub's Vercel status and Production
+deployment record both report success. The working public app is
+https://fanwars-in.vercel.app (Vercel project naveencharu/fanwars-in).
+HTTP smoke checks passed for landing, login, signup, home, tribes, create-fanwar
+and battle/6, plus bundled cover images and the Next.js image optimizer.
+These are HTTP checks, not a completed interactive signup/vote/mobile test.
+The default Create Next App title/description were replaced with FanWars branding
+for the user trial. Production Supabase remains unchanged: no admin connection,
+CLI token or connected dashboard was available. Closed-option SELECT and public
+results visibility migrations remain pending production application; baseline
+migration DDL must never be run against existing production tables.
