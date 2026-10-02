@@ -284,7 +284,6 @@ export default function HomePage() {
             {/* FEATURED BATTLE */}
 
             <div
-              id="battles"
               className="relative"
             >
 
@@ -351,7 +350,10 @@ export default function HomePage() {
           TRENDING
       =================================================== */}
 
-      <section className="bg-[#fcfbf8] px-5 py-20 sm:px-6 lg:px-8">
+      <section
+        id="battles"
+        className="scroll-mt-28 bg-[#fcfbf8] px-5 py-20 sm:px-6 md:scroll-mt-16 lg:px-8"
+      >
 
         <div className="mx-auto max-w-7xl">
 
